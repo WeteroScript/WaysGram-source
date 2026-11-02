@@ -188,6 +188,7 @@ public final class WaysGramGiftCatalogClient implements AutoCloseable {
         try {
             connection = (HttpURLConnection) new URL(url).openConnection();
             connection.setRequestMethod("GET");
+            connection.setInstanceFollowRedirects(false);
             connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
             connection.setReadTimeout(READ_TIMEOUT_MS);
             connection.setRequestProperty("Accept", "*/*");
@@ -227,7 +228,9 @@ public final class WaysGramGiftCatalogClient implements AutoCloseable {
                 && ("127.0.0.1".equals(host)
                 || "localhost".equalsIgnoreCase(host)
                 || "10.0.2.2".equals(host));
-        if ((!secure && !localHttp) || parsed.getUserInfo() != null
+        String basePath = parsed.getPath();
+        boolean rootPath = basePath == null || basePath.length() == 0 || "/".equals(basePath);
+        if ((!secure && !localHttp) || !rootPath || parsed.getUserInfo() != null
                 || parsed.getQuery() != null || parsed.getRef() != null) {
             throw new IOException("WaysGram API must use HTTPS outside local testing");
         }

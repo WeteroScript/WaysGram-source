@@ -1,6 +1,8 @@
 # WaysGram Android API contract: Telegram gift catalog
 
-Status: backend route implemented; Android UI wiring remains pending.
+Status: backend route and standalone Android API client overlay implemented; existing gift-screen wiring remains pending.
+
+Android overlay source: `android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramGiftCatalogClient.java`. The source-preparation script copies it into the pinned Telegram Android submodule. The client accepts an injected session provider; the application must supply the API root URL and WaysGram Bearer token from its secure session layer. The client callbacks run on its IO executor, so UI callers must dispatch view updates onto the main thread.
 
 ## Catalog
 

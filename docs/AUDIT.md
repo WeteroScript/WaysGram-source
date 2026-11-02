@@ -63,7 +63,7 @@ The AuthBot repository already contains a FastAPI + Aiogram service and a shared
 - API coverage includes profiles, personal messages, text channels, internal Stars/Gram balances and gifts;
 - admin access is restricted by `ADMIN_ID`.
 
-Current server-side limitations in that repository are documented in its README. Full groups, bot execution, media upload, push/WebSocket delivery and calls are not yet implemented.
+The AuthBot backend now includes text group chats with owner/admin/member roles, an internal BotFather registry, per-bot command lists, and a token-authenticated text message/update API. It does not execute arbitrary user-supplied code. Media upload, push/WebSocket delivery, calls, bot webhooks and a hardened isolated bot runtime are still not implemented.
 
 ## 6. Changes already committed to WaysGram-AuthBot
 
@@ -80,7 +80,7 @@ GitHub Actions test runs for the latest AuthBot changes are linked from the repo
 1. Import the correct WaysGram-specific UI/source or confirm that the provided Telegram client source is the intended visual base.
 2. Replace MTProto authentication with AuthBot login while preserving the screen layout.
 3. Replace Telegram server-dependent message, contact, group, channel, Stars, gift and auction calls with the private WaysGram API.
-4. Implement the missing groups and bot-management/runtime APIs.
+4. Complete the Android UI/API integration for groups and BotFather; add a controlled bot runtime or webhook mechanism only after the security model is designed.
 5. Import the actual complete gift catalogue and its image assets.
 6. Set an app package ID, signing configuration, own icon and own app/service credentials.
 7. Add Android CI, build and install APK, then perform end-to-end tests against the backend.

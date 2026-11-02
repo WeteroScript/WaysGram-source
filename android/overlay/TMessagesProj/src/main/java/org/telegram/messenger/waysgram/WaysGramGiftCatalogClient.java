@@ -1,0 +1,274 @@
+package org.telegram.messenger.waysgram;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+/**
+ * Read-only WaysGram client for Telegram's bot-scoped gift catalog.
+ *
+ * The base URL and the WaysGram session token are supplied by the application.
+ * No Telegram bot token or Telegram file_id is stored in this class or sent to
+ * the Android client. Network callbacks run on this class's IO thread.
+ */
+public final class WaysGramGiftCatalogClient implements AutoCloseable {
+    private static final int CONNECT_TIMEOUT_MS = 15000;
+    private static final int READ_TIMEOUT_MS = 30000;
+    private static final int MAX_JSON_BYTES = 2 * 1024 * 1024;
+    private static final int MAX_STICKER_BYTES = 20 * 1024 * 1024;
+
+    public interface SessionProvider {
+        String getApiBaseUrl();
+        String getWaysGramSessionToken();
+    }
+
+    public interface CatalogCallback {
+        void onLoaded(List<Gift> gifts, boolean stale, long syncedAt);
+        void onError(String message);
+    }
+
+    public interface StickerCallback {
+        void onLoaded(byte[] bytes, String mimeType);
+        void onError(String message);
+    }
+
+    public static final class Gift {
+        public final String id;
+        public final String title;
+        public final String emoji;
+        public final String currency;
+        public final int starCount;
+        public final Integer upgradeStarCount;
+        public final boolean premium;
+        public final boolean hasColors;
+        public final boolean limited;
+        public final Integer totalCount;
+        public final Integer remainingCount;
+        public final Integer personalTotalCount;
+        public final Integer personalRemainingCount;
+        public final int uniqueGiftVariantCount;
+        public final String stickerType;
+        public final String stickerMimeType;
+        public final String stickerUrl;
+        public final boolean animatedSticker;
+        public final boolean videoSticker;
+
+        private Gift(JSONObject object, String baseUrl) {
+            id = object.optString("id", "");
+            title = object.optString("title", id);
+            emoji = object.optString("emoji", "");
+            currency = object.optString("currency", "telegram_stars");
+            starCount = Math.max(0, object.optInt("star_count", 0));
+            upgradeStarCount = optionalInt(object, "upgrade_star_count");
+            premium = object.optBoolean("is_premium", false);
+            hasColors = object.optBoolean("has_colors", false);
+            limited = object.optBoolean("is_limited", false);
+            totalCount = optionalInt(object, "total_count");
+            remainingCount = optionalInt(object, "remaining_count");
+            personalTotalCount = optionalInt(object, "personal_total_count");
+            personalRemainingCount = optionalInt(object, "personal_remaining_count");
+            uniqueGiftVariantCount = Math.max(0, object.optInt("unique_gift_variant_count", 0));
+
+            JSONObject sticker = object.optJSONObject("sticker");
+            if (sticker == null) {
+                sticker = new JSONObject();
+            }
+            stickerType = sticker.optString("type", "regular");
+            stickerMimeType = sticker.optString("mime_type", "application/octet-stream");
+            animatedSticker = sticker.optBoolean("is_animated", false);
+            videoSticker = sticker.optBoolean("is_video", false);
+            String path = sticker.optString("url", "");
+            if (path.startsWith("https://") || path.startsWith("http://")) {
+                stickerUrl = path;
+            } else {
+                stickerUrl = baseUrl + (path.startsWith("/") ? path : "/" + path);
+            }
+        }
+    }
+
+    private final SessionProvider sessionProvider;
+    private final ExecutorService ioExecutor;
+
+    public WaysGramGiftCatalogClient(SessionProvider sessionProvider) {
+        if (sessionProvider == null) {
+            throw new IllegalArgumentException("SessionProvider is required");
+        }
+        this.sessionProvider = sessionProvider;
+        ioExecutor = Executors.newSingleThreadExecutor(runnable -> {
+            Thread thread = new Thread(runnable, "WaysGramGiftCatalog");
+            thread.setDaemon(true);
+            return thread;
+        });
+    }
+
+    /**
+     * Loads the cached Telegram catalog from AuthBot. AuthBot refreshes its own
+     * cache when the last successful Telegram sync is older than 60 seconds.
+     */
+    public void loadCatalog(CatalogCallback callback) {
+        if (callback == null) {
+            return;
+        }
+        ioExecutor.execute(() -> {
+            try {
+                String baseUrl = getBaseUrl();
+                JSONObject response = requestJson(baseUrl + "/api/telegram/gifts");
+                JSONArray source = response.optJSONArray("gifts");
+                if (source == null) {
+                    throw new IOException("WaysGram returned no gift list");
+                }
+                ArrayList<Gift> gifts = new ArrayList<>(source.length());
+                for (int i = 0; i < source.length(); i++) {
+                    JSONObject item = source.optJSONObject(i);
+                    if (item != null && item.optString("id", "").length() > 0) {
+                        gifts.add(new Gift(item, baseUrl));
+                    }
+                }
+                callback.onLoaded(
+                        Collections.unmodifiableList(gifts),
+                        response.optBoolean("stale", false),
+                        response.optLong("synced_at", 0L)
+                );
+            } catch (Exception exception) {
+                callback.onError(toSafeError(exception));
+            }
+        });
+    }
+
+    /**
+     * Downloads a gift's sticker bytes through the authenticated WaysGram
+     * proxy. The Telegram bot token and Telegram file_id never reach the app.
+     */
+    public void downloadSticker(Gift gift, StickerCallback callback) {
+        if (gift == null || callback == null || gift.stickerUrl.length() == 0) {
+            if (callback != null) {
+                callback.onError("Стикер подарка недоступен");
+            }
+            return;
+        }
+        ioExecutor.execute(() -> {
+            try {
+                byte[] bytes = requestBytes(gift.stickerUrl, MAX_STICKER_BYTES);
+                callback.onLoaded(bytes, gift.stickerMimeType);
+            } catch (Exception exception) {
+                callback.onError(toSafeError(exception));
+            }
+        });
+    }
+
+    private JSONObject requestJson(String url) throws IOException {
+        byte[] body = requestBytes(url, MAX_JSON_BYTES);
+        try {
+            return new JSONObject(new String(body, StandardCharsets.UTF_8));
+        } catch (Exception exception) {
+            throw new IOException("WaysGram returned invalid JSON", exception);
+        }
+    }
+
+    private byte[] requestBytes(String url, int maxBytes) throws IOException {
+        String token = sessionProvider.getWaysGramSessionToken();
+        if (token == null || token.trim().length() == 0) {
+            throw new IOException("WaysGram session is missing");
+        }
+        HttpURLConnection connection = null;
+        try {
+            connection = (HttpURLConnection) new URL(url).openConnection();
+            connection.setRequestMethod("GET");
+            connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
+            connection.setReadTimeout(READ_TIMEOUT_MS);
+            connection.setRequestProperty("Accept", "*/*");
+            connection.setRequestProperty("Authorization", "Bearer " + token.trim());
+            int status = connection.getResponseCode();
+            if (status < 200 || status >= 300) {
+                throw new HttpStatusException(status);
+            }
+            int contentLength = connection.getContentLength();
+            if (contentLength > maxBytes) {
+                throw new IOException("WaysGram file exceeds the allowed size");
+            }
+            try (InputStream input = connection.getInputStream()) {
+                return readLimited(input, maxBytes);
+            }
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
+    }
+
+    private String getBaseUrl() throws IOException {
+        String baseUrl = sessionProvider.getApiBaseUrl();
+        if (baseUrl == null || baseUrl.trim().length() == 0) {
+            throw new IOException("WaysGram API address is missing");
+        }
+        baseUrl = baseUrl.trim();
+        while (baseUrl.endsWith("/")) {
+            baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
+        }
+        if (!baseUrl.startsWith("https://")
+                && !baseUrl.startsWith("http://127.0.0.1")
+                && !baseUrl.startsWith("http://localhost")
+                && !baseUrl.startsWith("http://10.0.2.2")) {
+            throw new IOException("WaysGram API must use HTTPS outside local testing");
+        }
+        return baseUrl;
+    }
+
+    private static byte[] readLimited(InputStream input, int maxBytes) throws IOException {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        byte[] buffer = new byte[8192];
+        int total = 0;
+        int read;
+        while ((read = input.read(buffer)) != -1) {
+            total += read;
+            if (total > maxBytes) {
+                throw new IOException("WaysGram response exceeds the allowed size");
+            }
+            output.write(buffer, 0, read);
+        }
+        return output.toByteArray();
+    }
+
+    private static Integer optionalInt(JSONObject object, String key) {
+        if (object == null || !object.has(key) || object.isNull(key)) {
+            return null;
+        }
+        return object.optInt(key);
+    }
+
+    private static String toSafeError(Exception exception) {
+        if (exception instanceof HttpStatusException) {
+            return "WaysGram API returned HTTP " + ((HttpStatusException) exception).statusCode;
+        }
+        if (exception instanceof IOException && exception.getMessage() != null
+                && exception.getMessage().startsWith("WaysGram")) {
+            return exception.getMessage();
+        }
+        return "Не удалось загрузить каталог подарков WaysGram";
+    }
+
+    @Override
+    public void close() {
+        ioExecutor.shutdownNow();
+    }
+
+    private static final class HttpStatusException extends IOException {
+        final int statusCode;
+
+        HttpStatusException(int statusCode) {
+            super("HTTP " + statusCode);
+            this.statusCode = statusCode;
+        }
+    }
+}

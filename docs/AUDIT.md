@@ -60,7 +60,7 @@ The Bot API method returns the gifts that the configured AuthBot may send. It is
 
 Telegram's `star_count` remains `telegram_stars`. It is not converted into internal WaysGram Stars or Gram. The imported catalog is stored separately from WaysGram's internal `gift_catalog` and is read-only in this integration.
 
-The Android client still needs to call `/api/telegram/gifts` and render the returned sticker URLs with the user's Bearer session. This client wiring has not yet been implemented in the provided Android source repository.
+The source repository now pins the official Android tree as submodule `android/telegram-upstream` at Telegram 13.1.1 (build 7237). A WaysGram overlay class, `android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramGiftCatalogClient.java`, reads `/api/telegram/gifts` and downloads sticker bytes through the authenticated proxy. `scripts/prepare-android-source.sh` checks out the pinned submodule and copies the overlay into the Android tree. The class is not yet connected to the existing gift screen; this still requires UI/controller integration and session-provider wiring.
 
 ## 5. Build environment
 
@@ -71,7 +71,7 @@ The archive specifies:
 - Gradle wrapper 8.13
 - Android Gradle Plugin 8.13.2
 
-The provided wrapper attempted to download Gradle 8.13, but the execution environment could not resolve `services.gradle.org` (`UnknownHostException`). No Android SDK / NDK installation was detected in the execution environment. Therefore no APK build has been completed in this environment.
+The Android source is now available in the WaysGram repository through a pinned Git submodule. The source-preparation script checks out the source and overlays without invoking Gradle. The previous execution environment could not resolve `services.gradle.org` (`UnknownHostException`) and had no Android SDK/NDK, so no APK build is being attempted during this phase.
 
 The archive also contains Git submodule declarations. A complete checkout needs its submodules, Google/Firebase configuration and the app's own API/build credentials. Do not reuse the sample Telegram API credentials for a distributed fork.
 
@@ -99,9 +99,9 @@ GitHub Actions test runs for the latest AuthBot changes are linked from the repo
 
 ## 8. Remaining work before a functional APK
 
-1. Import the correct WaysGram-specific UI/source or confirm that the provided Telegram client source is the intended visual base.
+1. Connect `WaysGramGiftCatalogClient` to the existing gift screen/controller and inject the WaysGram API base URL plus Bearer session.
 2. Replace MTProto authentication with AuthBot login while preserving the screen layout.
-3. Replace Telegram server-dependent message, contact, group, channel, Stars, gift and auction calls with the private WaysGram API.
+3. Replace the remaining Telegram server-dependent profile, messaging, contact, group, channel and balance calls with the private WaysGram API; keep the gift catalog's Bot API source clearly separated from Telegram-only data.
 4. Complete the Android UI/API integration for groups and BotFather; add a controlled bot runtime or webhook mechanism only after the security model is designed.
 5. Wire the Android gift UI to `GET /api/telegram/gifts` and render its authenticated sticker-proxy URLs. The current source provides the Bot API subset; a full MTProto-only catalogue remains a separate, optional integration.
 6. Set an app package ID, signing configuration, own icon and own app/service credentials.

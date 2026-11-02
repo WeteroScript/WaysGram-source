@@ -15,10 +15,10 @@
 ```bash
 git clone --recurse-submodules https://github.com/WeteroScript/WaysGram-source.git
 cd WaysGram-source
-./scripts/prepare-android-source.sh
+bash scripts/prepare-android-source.sh
 ```
 
-Путь Android-проекта: `android/telegram-upstream`. Если репозиторий уже клонирован без submodules, скрипт их инициализирует. Сам APK на этом этапе не собирается.
+Путь Android-проекта: `android/telegram-upstream`. Если репозиторий уже клонирован без submodules, скрипт их инициализирует. Он также копирует WaysGram overlay-классы в рабочую копию Android-проекта. Сейчас добавлен `WaysGramGiftCatalogClient`: он читает `/api/telegram/gifts` и получает файлы стикеров через защищённый WaysGram proxy. UI-подключение и внедрение WaysGram-сессии в приложение ещё выполняются. Сам APK на этом этапе не собирается.
 
 ## Связанные компоненты
 

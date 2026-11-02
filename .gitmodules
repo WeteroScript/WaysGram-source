@@ -1,0 +1,3 @@
+[submodule "android/telegram-upstream"]
+	path = android/telegram-upstream
+	url = https://github.com/DrKLO/Telegram.git

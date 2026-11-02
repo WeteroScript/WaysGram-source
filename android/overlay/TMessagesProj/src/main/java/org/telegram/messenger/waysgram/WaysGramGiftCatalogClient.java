@@ -89,10 +89,13 @@ public final class WaysGramGiftCatalogClient implements AutoCloseable {
             animatedSticker = sticker.optBoolean("is_animated", false);
             videoSticker = sticker.optBoolean("is_video", false);
             String path = sticker.optString("url", "");
-            if (path.startsWith("https://") || path.startsWith("http://")) {
-                stickerUrl = path;
+            if (path.startsWith("/")) {
+                stickerUrl = baseUrl + path;
             } else {
-                stickerUrl = baseUrl + (path.startsWith("/") ? path : "/" + path);
+                // The server contract uses relative API paths only. Do not allow
+                // a remote catalog response to redirect authenticated sticker
+                // downloads to an unrelated host.
+                stickerUrl = "";
             }
         }
     }
@@ -216,10 +219,16 @@ public final class WaysGramGiftCatalogClient implements AutoCloseable {
         while (baseUrl.endsWith("/")) {
             baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
         }
-        if (!baseUrl.startsWith("https://")
-                && !baseUrl.startsWith("http://127.0.0.1")
-                && !baseUrl.startsWith("http://localhost")
-                && !baseUrl.startsWith("http://10.0.2.2")) {
+        URL parsed = new URL(baseUrl);
+        String protocol = parsed.getProtocol();
+        String host = parsed.getHost();
+        boolean secure = "https".equalsIgnoreCase(protocol);
+        boolean localHttp = "http".equalsIgnoreCase(protocol)
+                && ("127.0.0.1".equals(host)
+                || "localhost".equalsIgnoreCase(host)
+                || "10.0.2.2".equals(host));
+        if ((!secure && !localHttp) || parsed.getUserInfo() != null
+                || parsed.getQuery() != null || parsed.getRef() != null) {
             throw new IOException("WaysGram API must use HTTPS outside local testing");
         }
         return baseUrl;

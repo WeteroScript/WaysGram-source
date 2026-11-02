@@ -1,0 +1,35 @@
+name: Android source checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  source-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check source preparation script
+        run: bash -n scripts/prepare-android-source.sh
+
+      - name: Verify pinned Android submodule
+        shell: bash
+        run: |
+          test "$(git config -f .gitmodules --get submodule.android/telegram-upstream.path)" = "android/telegram-upstream"
+          test "$(git config -f .gitmodules --get submodule.android/telegram-upstream.url)" = "https://github.com/DrKLO/Telegram.git"
+          entry="$(git ls-tree HEAD android/telegram-upstream)"
+          expected="3de37c8cfb039452be7398909461da6288babf15"
+          [[ "$entry" == *"commit $expected"* ]]
+
+      - name: Verify WaysGram Android overlay
+        run: |
+          test -s android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramGiftCatalogClient.java
+          grep -q 'GET /api/telegram/gifts' docs/ANDROID_API_CONTRACT.md
+          grep -q 'prepare-android-source.sh' README.md

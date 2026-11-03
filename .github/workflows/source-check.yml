@@ -35,6 +35,21 @@ jobs:
 
       - name: Verify WaysGram Android overlay
         run: |
-          test -s android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramGiftCatalogClient.java
+          for source in \
+            WaysGramSessionStore.java \
+            WaysGramAuthClient.java \
+            WaysGramApiClient.java \
+            WaysGramLoginSheet.java \
+            WaysGramLoginFragment.java \
+            WaysGramHomeFragment.java \
+            WaysGramDirectoryFragment.java \
+            WaysGramChatFragment.java \
+            WaysGramTimelineFragment.java \
+            WaysGramGiftCatalogClient.java \
+            WaysGramGiftCatalogSheet.java; do
+            test -s "android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/$source"
+          done
+          grep -q 'patch_launch_source' scripts/apply-android-patches.py
           grep -q 'GET /api/telegram/gifts' docs/ANDROID_API_CONTRACT.md
+          grep -q 'AuthWaysGram_bot' README.md
           grep -q 'prepare-android-source.sh' README.md

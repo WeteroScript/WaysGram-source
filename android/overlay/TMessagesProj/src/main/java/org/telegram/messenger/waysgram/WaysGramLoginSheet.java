@@ -234,10 +234,10 @@ public final class WaysGramLoginSheet extends BottomSheet {
                 statusView.setText("Вход выполнен" +
                         (displayName.length() > 0 ? ": " + displayName : "") + ".");
                 Toast.makeText(getContext(), "Сессия WaysGram сохранена", Toast.LENGTH_SHORT).show();
+                dismiss();
                 if (onLoginSuccess != null) {
                     onLoginSuccess.run();
                 }
-                dismiss();
             }
 
             @Override

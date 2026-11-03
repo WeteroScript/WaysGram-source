@@ -53,6 +53,18 @@ public final class WaysGramGiftCatalogClient implements AutoCloseable {
         public final boolean premium;
         public final boolean hasColors;
         public final boolean limited;
+        public final boolean soldOut;
+        public final boolean auction;
+        public final boolean birthday;
+        public final boolean requirePremium;
+        public final boolean limitedPerUser;
+        public final Integer availabilityResale;
+        public final Integer convertStars;
+        public final Integer lockedUntilDate;
+        public final String auctionSlug;
+        public final Integer giftsPerRound;
+        public final Integer auctionStartDate;
+        public final Integer upgradeVariants;
         public final Integer totalCount;
         public final Integer remainingCount;
         public final Integer personalTotalCount;
@@ -74,8 +86,26 @@ public final class WaysGramGiftCatalogClient implements AutoCloseable {
             premium = object.optBoolean("is_premium", false);
             hasColors = object.optBoolean("has_colors", false);
             limited = object.optBoolean("is_limited", false);
-            totalCount = optionalInt(object, "total_count");
-            remainingCount = optionalInt(object, "remaining_count");
+            soldOut = object.optBoolean("sold_out", false);
+            auction = object.optBoolean("auction", false);
+            birthday = object.optBoolean("birthday", false);
+            requirePremium = object.optBoolean("require_premium", false);
+            limitedPerUser = object.optBoolean("limited_per_user", false);
+            availabilityResale = optionalInt(object, "availability_resale");
+            convertStars = optionalInt(object, "convert_stars");
+            lockedUntilDate = optionalInt(object, "locked_until_date");
+            auctionSlug = object.optString("auction_slug", "");
+            giftsPerRound = optionalInt(object, "gifts_per_round");
+            auctionStartDate = optionalInt(object, "auction_start_date");
+            upgradeVariants = optionalInt(object, "upgrade_variants");
+            totalCount = optionalInt(object, "availability_total");
+            if (totalCount == null) {
+                totalCount = optionalInt(object, "total_count");
+            }
+            remainingCount = optionalInt(object, "availability_remains");
+            if (remainingCount == null) {
+                remainingCount = optionalInt(object, "remaining_count");
+            }
             personalTotalCount = optionalInt(object, "personal_total_count");
             personalRemainingCount = optionalInt(object, "personal_remaining_count");
             uniqueGiftVariantCount = Math.max(0, object.optInt("unique_gift_variant_count", 0));

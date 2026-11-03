@@ -86,6 +86,9 @@ jobs:
           grep -q 'REQUEST_SAVE_DOCUMENT' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
           grep -q 'uploadDocument' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramApiClient.java
           grep -q 'downloadDocumentToUri' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramApiClient.java
+          grep -q 'public void checkServer(Callback callback)' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramAuthClient.java
+          grep -q 'GET.*health' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramAuthClient.java
+          grep -q 'Проверить соединение с сервером' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramLoginSheet.java
           grep -q 'media_type' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramChatFragment.java
           grep -q 'media_name' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
           grep -q 'ImageCallback' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java

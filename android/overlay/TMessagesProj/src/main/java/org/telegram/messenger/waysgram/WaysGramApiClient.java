@@ -53,6 +53,10 @@ public final class WaysGramApiClient implements AutoCloseable {
         execute("POST", path, payload == null ? new JSONObject() : payload, callback);
     }
 
+    public void put(String path, JSONObject payload, Callback callback) {
+        execute("PUT", path, payload == null ? new JSONObject() : payload, callback);
+    }
+
     public void delete(String path, Callback callback) {
         execute("DELETE", path, null, callback);
     }
@@ -90,7 +94,7 @@ public final class WaysGramApiClient implements AutoCloseable {
             connection.setReadTimeout(READ_TIMEOUT_MS);
             connection.setRequestProperty("Accept", "application/json");
             connection.setRequestProperty("Authorization", "Bearer " + token);
-            if ("POST".equals(method)) {
+            if ("POST".equals(method) || "PUT".equals(method)) {
                 connection.setDoOutput(true);
                 connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
                 byte[] bytes = payload.toString().getBytes(StandardCharsets.UTF_8);

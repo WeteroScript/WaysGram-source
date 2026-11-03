@@ -38,6 +38,7 @@ public final class WaysGramBotDetailFragment extends BaseFragment {
     private Button addCommandButton;
     private Button saveCommandsButton;
     private Button resetTokenButton;
+    private Button chatButton;
     private Button disableBotButton;
     private final ArrayList<BotCommand> commands = new ArrayList<>();
 
@@ -87,7 +88,7 @@ public final class WaysGramBotDetailFragment extends BaseFragment {
         copyButton.setOnClickListener(view -> copyToken());
         tokenView.setTag(copyButton);
 
-        Button chatButton = button(context, "Открыть чат с ботом");
+        chatButton = button(context, "Открыть чат с ботом");
         root.addView(chatButton, matchWrap());
         chatButton.setOnClickListener(view -> presentFragment(
                 new WaysGramBotChatFragment(botId, botTitle), false
@@ -187,6 +188,7 @@ public final class WaysGramBotDetailFragment extends BaseFragment {
                 saveCommandsButton.setEnabled(active);
                 resetTokenButton.setEnabled(active);
                 disableBotButton.setEnabled(active);
+                chatButton.setEnabled(active);
                 statusView.setText(active
                         ? "Токен хранится на сервере в виде хеша; полный токен можно получить только при сбросе."
                         : "Бот отключён. Его токен больше не действует.");

@@ -80,6 +80,7 @@ The home screen opens the WaysGram BotFather screens. The Android app uses the e
 - `DELETE /api/bots/{bot_id}` — disable the bot and invalidate its token.
 
 The internal bot token is a bearer credential. Store it privately; do not paste it into public chats or commit it to source control. The backend stores only its hash. Internal bot updates and replies use `GET /api/bot-api/getUpdates` and `POST /api/bot-api/sendMessage`.
+The Android bot detail screen also opens a user-to-bot chat using `POST /api/bots/{bot_id}/messages` and `GET /api/bots/{bot_id}/messages?after_id=...`. Open chats poll every four seconds. The first outgoing message creates the chat/update queue. Incoming bot replies appear after a connected bot client posts them through the internal `sendMessage` route.
 
 These bots belong to WaysGram's internal registry. They are not Telegram Bot API bots and the server does not execute arbitrary user-supplied programs. A separate controlled runtime/webhook architecture would be required before hosted custom bot code could be supported.
 

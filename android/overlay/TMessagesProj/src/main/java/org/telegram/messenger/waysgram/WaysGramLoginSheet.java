@@ -23,6 +23,7 @@ import org.telegram.ui.ActionBar.Theme;
  * No Telegram auth code, phone login, or Telegram account session is touched.
  */
 public final class WaysGramLoginSheet extends BottomSheet {
+    private static final String DEFAULT_API_BASE_URL = "https://bot-1793554244-6434-weterochina.bothost.tech";
     private final WaysGramSessionStore sessionStore;
     private final Runnable onLoginSuccess;
     private WaysGramAuthClient authClient;
@@ -88,7 +89,7 @@ public final class WaysGramLoginSheet extends BottomSheet {
                 InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI
         );
         String savedBase = sessionStore.getApiBaseUrl();
-        apiBaseInput.setText(savedBase != null ? savedBase : "http://127.0.0.1:8081");
+        apiBaseInput.setText(savedBase != null ? savedBase : DEFAULT_API_BASE_URL);
         apiBaseInput.setSingleLine(true);
 
         virtualNumberInput = addField(

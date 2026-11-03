@@ -68,6 +68,10 @@ The channel timeline loads `GET /api/channels/{channel_id}/admins`, which return
 
 The Android timeline now exposes these controls and lets the server enforce the final permission checks. The channel administrator list route is authenticated; it does not expose bot credentials or allow privilege changes by non-owners.
 
+## Message refresh
+
+Direct messages and group/channel timelines poll their authenticated history routes every four seconds using the incremental `after_id` cursor. This gives an open screen near-real-time text refresh without requiring a manual reload. It is HTTP polling, not WebSocket or push delivery; background notifications and delivery while the app is closed remain separate work.
+
 ## Telegram gift catalogue
 
 The primary server source is bot-authenticated MTProto. When `TELEGRAM_API_ID` and `TELEGRAM_API_HASH` are configured, AuthBot starts a Telethon client using `BOT_TOKEN` and calls Telegram's `payments.getStarGifts`. The MTProto session belongs to the configured bot; WaysGram users do not provide Telegram credentials, personal login codes, or account sessions.

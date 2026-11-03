@@ -39,7 +39,7 @@ if [[ -d "$OVERLAY_ROOT" ]]; then
     target_file="$ANDROID_ROOT/TMessagesProj/src/main/java/$relative_path"
     mkdir -p "$(dirname "$target_file")"
     cp "$source_file" "$target_file"
-    echo "Applied overlay: $relative_path"
+    echo "Copied WaysGram service overlay: $relative_path"
   done < <(find "$OVERLAY_ROOT" -type f -print0)
 fi
 
@@ -48,6 +48,6 @@ echo "Upstream: Telegram $EXPECTED_VERSION_NAME ($EXPECTED_VERSION_CODE)"
 echo "Pinned commit: $ACTUAL_COMMIT"
 python3 "$ROOT/scripts/apply-android-patches.py" --android-root "$ANDROID_ROOT"
 
-echo "WaysGram overlays copied into TMessagesProj/src/main/java."
-echo "Gift catalog entry patched into the original GiftSheet."
+echo "Original Telegram startup, login screens, navigation, and GiftSheet remain unchanged."
+echo "WaysGram REST overlay classes are present but are not selected as the startup UI."
 echo "No APK was built."

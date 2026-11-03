@@ -55,7 +55,18 @@ public final class WaysGramAuthClient implements AutoCloseable {
     }
 
     public void checkServer(Callback callback) {
-        execute(callback, () -> getHealth());
+        execute(callback, () -> {
+            JSONObject health = getHealth();
+            JSONObject config = getApiConfig();
+            if (!"WaysGram".equals(config.optString("brand"))
+                    || config.optInt("api_version", 0) < 1
+                    || !"authwaysgram_bot".equals(config.optString("auth"))) {
+                throw new IOException("Сервер отвечает, но WaysGram API не прошёл проверку конфигурации");
+            }
+            health.put("api_version", config.optInt("api_version", 0));
+            health.put("authbot_delivery_ready", config.optBoolean("authbot_delivery_ready", false));
+            return health;
+        });
     }
 
     public void requestCode(String virtualNumber, Callback callback) {
@@ -175,6 +186,41 @@ public final class WaysGramAuthClient implements AutoCloseable {
             if (!"online".equals(response.optString("status"))
                     || !"waysgram-authbot".equals(response.optString("service"))) {
                 throw new IOException("Адрес не отвечает как сервер WaysGram AuthBot");
+            }
+            return response;
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
+    }
+
+    private JSONObject getApiConfig() throws IOException {
+        HttpURLConnection connection = null;
+        try {
+            connection = (HttpURLConnection) new URL(apiBaseUrl + "/api/config").openConnection();
+            connection.setRequestMethod("GET");
+            connection.setInstanceFollowRedirects(false);
+            connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
+            connection.setReadTimeout(READ_TIMEOUT_MS);
+            connection.setRequestProperty("Accept", "application/json");
+
+            int status = connection.getResponseCode();
+            InputStream stream = status >= 200 && status < 300
+                    ? connection.getInputStream()
+                    : connection.getErrorStream();
+            byte[] bytes = stream == null ? new byte[0] : readLimited(stream, MAX_RESPONSE_BYTES);
+            JSONObject response;
+            try {
+                response = bytes.length == 0
+                        ? new JSONObject()
+                        : new JSONObject(new String(bytes, StandardCharsets.UTF_8));
+            } catch (Exception exception) {
+                throw new IOException("WaysGram вернул некорректный ответ конфигурации API", exception);
+            }
+            if (status < 200 || status >= 300) {
+                String detail = response.optString("detail", "");
+                throw new ApiException(status, detail);
             }
             return response;
         } finally {

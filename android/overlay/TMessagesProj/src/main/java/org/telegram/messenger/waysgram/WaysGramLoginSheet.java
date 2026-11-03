@@ -3,6 +3,7 @@ package org.telegram.messenger.waysgram;
 import android.content.Context;
 import android.graphics.Typeface;
 import android.text.InputType;
+import android.text.InputFilter;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -111,10 +112,11 @@ public final class WaysGramLoginSheet extends BottomSheet {
                 context,
                 content,
                 "Шестизначный код из AuthWaysGram_bot",
-                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL
+                InputType.TYPE_CLASS_NUMBER
         );
         codeInput.setSingleLine(true);
         codeInput.setMaxEms(6);
+        codeInput.setFilters(new InputFilter[]{new InputFilter.LengthFilter(6)});
 
         verifyButton = new Button(context);
         verifyButton.setText("Войти в WaysGram");

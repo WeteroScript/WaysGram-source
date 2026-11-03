@@ -42,6 +42,51 @@ class GiftSheet {
         with self.assertRaises(ValueError):
             PATCHER.patch_source("class GiftSheet {}")
 
+    def test_launch_activity_routes_to_waysgram_session(self) -> None:
+        launch_source = """import org.telegram.messenger.UserObject;
+
+class LaunchActivity {
+    private BaseFragment getClientNotActivatedFragment() {
+        if (LoginActivity.loadCurrentState(false, currentAccount).getInt("currentViewNum", 0) != 0) {
+            return new LoginActivity();
+        }
+        return new IntroActivity();
+    }
+
+        if (!UserConfig.getInstance(currentAccount).isClientActivated()) {
+            actionBarLayout.addFragmentToStack(getClientNotActivatedFragment());
+        } else {
+            MainTabsActivity mainTabsActivity = new MainTabsActivity();
+            actionBarLayout.addFragmentToStack(mainTabsActivity);
+        }
+}
+"""
+        updated = PATCHER.patch_launch_source(launch_source)
+        self.assertIn("WaysGramSessionStore.getInstance(this).hasSession()", updated)
+        self.assertIn("return new WaysGramHomeFragment();", updated)
+        self.assertIn("return new WaysGramLoginFragment();", updated)
+        self.assertNotIn("MainTabsActivity mainTabsActivity = new MainTabsActivity();", updated)
+
+    def test_launch_activity_patch_is_idempotent(self) -> None:
+        launch_source = """import org.telegram.messenger.UserObject;
+class LaunchActivity {
+    private BaseFragment getClientNotActivatedFragment() {
+        if (LoginActivity.loadCurrentState(false, currentAccount).getInt("currentViewNum", 0) != 0) {
+            return new LoginActivity();
+        }
+        return new IntroActivity();
+    }
+        if (!UserConfig.getInstance(currentAccount).isClientActivated()) {
+            actionBarLayout.addFragmentToStack(getClientNotActivatedFragment());
+        } else {
+            MainTabsActivity mainTabsActivity = new MainTabsActivity();
+            actionBarLayout.addFragmentToStack(mainTabsActivity);
+        }
+}
+"""
+        once = PATCHER.patch_launch_source(launch_source)
+        self.assertEqual(once, PATCHER.patch_launch_source(once))
+
 
 if __name__ == "__main__":
     unittest.main()

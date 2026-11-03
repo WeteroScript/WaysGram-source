@@ -16,8 +16,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Check source preparation script
-        run: bash -n scripts/prepare-android-source.sh
+      - name: Check source preparation scripts
+        run: |
+          bash -n scripts/prepare-android-source.sh
+          python -m py_compile scripts/apply-android-patches.py
 
       - name: Verify pinned Android submodule
         shell: bash

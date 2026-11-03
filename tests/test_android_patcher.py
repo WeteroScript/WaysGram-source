@@ -30,7 +30,8 @@ class GiftSheet {
         self.assertIn("WaysGramSessionStore", updated)
         self.assertIn("Подарки WaysGram", updated)
         self.assertIn("WaysGramLoginSheet", updated)
-        self.assertIn("new WaysGramLoginSheet(context, sessionStore, resourcesProvider).show()", updated)
+        self.assertIn("new WaysGramLoginSheet(context, sessionStore, resourcesProvider, () ->", updated)
+        self.assertIn("new WaysGramGiftCatalogSheet(context, sessionStore, resourcesProvider).show()", updated)
 
     def test_patch_is_idempotent(self) -> None:
         once = PATCHER.patch_source(self.original)

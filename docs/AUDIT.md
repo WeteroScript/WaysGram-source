@@ -60,7 +60,17 @@ The Bot API method returns the gifts that the configured AuthBot may send. It is
 
 Telegram's `star_count` remains `telegram_stars`. It is not converted into internal WaysGram Stars or Gram. The imported catalog is stored separately from WaysGram's internal `gift_catalog` and is read-only in this integration.
 
-The source repository now pins the official Android tree as submodule `android/telegram-upstream` at Telegram 13.1.1 (build 7237). A WaysGram overlay class, `android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramGiftCatalogClient.java`, reads `/api/telegram/gifts` and downloads sticker bytes through the authenticated proxy. `scripts/prepare-android-source.sh` checks out the pinned submodule and copies the overlay into the Android tree. The class is not yet connected to the existing gift screen; this still requires UI/controller integration and session-provider wiring.
+The source repository pins the official Android tree as submodule `android/telegram-upstream` at Telegram 13.1.1 (build 7237). WaysGram overlays now include:
+
+- `WaysGramSessionStore`: Android Keystore AES-GCM storage for the WaysGram API base URL and bearer session token.
+- `WaysGramAuthClient` and `WaysGramLoginSheet`: virtual +1 number / AuthWaysGram_bot OTP request and verification against `/api/auth/request-code` and `/api/auth/verify-code`. No Telegram personal login codes or account sessions are used.
+- `WaysGramLoginFragment` and `WaysGramHomeFragment`: initial sign-in page and API-backed profile/wallet view.
+- `WaysGramApiClient`: authenticated JSON REST client.
+- `WaysGramDirectoryFragment` and `WaysGramChatFragment`: conversation list and direct text messages through the private WaysGram API.
+- `WaysGramTimelineFragment`: group/channel text histories and posting.
+- `WaysGramGiftCatalogClient` and `WaysGramGiftCatalogSheet`: read-only MTProto gift catalog presentation and sticker proxy.
+
+The source-preparation patcher changes the upstream `LaunchActivity` startup fragment choice to open WaysGram login or home based on the WaysGram session. It also adds a separate WaysGram catalog entry to the original `GiftSheet`. This is an early UI/API slice, not full client parity: media, push/WebSocket delivery, contacts, calls, full group/channel creation and management, bot management UI, and remaining Telegram-backed screens still require migration. No APK has been built.
 
 ## 5. Build environment
 

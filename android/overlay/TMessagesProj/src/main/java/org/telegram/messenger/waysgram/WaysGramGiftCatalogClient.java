@@ -98,14 +98,16 @@ public final class WaysGramGiftCatalogClient implements AutoCloseable {
             giftsPerRound = optionalInt(object, "gifts_per_round");
             auctionStartDate = optionalInt(object, "auction_start_date");
             upgradeVariants = optionalInt(object, "upgrade_variants");
-            totalCount = optionalInt(object, "availability_total");
-            if (totalCount == null) {
-                totalCount = optionalInt(object, "total_count");
+            Integer totalCountValue = optionalInt(object, "availability_total");
+            if (totalCountValue == null) {
+                totalCountValue = optionalInt(object, "total_count");
             }
-            remainingCount = optionalInt(object, "availability_remains");
-            if (remainingCount == null) {
-                remainingCount = optionalInt(object, "remaining_count");
+            totalCount = totalCountValue;
+            Integer remainingCountValue = optionalInt(object, "availability_remains");
+            if (remainingCountValue == null) {
+                remainingCountValue = optionalInt(object, "remaining_count");
             }
+            remainingCount = remainingCountValue;
             personalTotalCount = optionalInt(object, "personal_total_count");
             personalRemainingCount = optionalInt(object, "personal_remaining_count");
             uniqueGiftVariantCount = Math.max(0, object.optInt("unique_gift_variant_count", 0));

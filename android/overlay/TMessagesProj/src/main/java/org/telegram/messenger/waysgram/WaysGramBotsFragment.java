@@ -278,7 +278,9 @@ public final class WaysGramBotsFragment extends BaseFragment {
                             new WaysGramBotDetailFragment(id, name), false
                     ));
                 }
-                statusView.setText("Активных и отключённых ботов в списке: " + count);
+                if (tokenView.getVisibility() != View.VISIBLE) {
+                    statusView.setText("Активных и отключённых ботов в списке: " + count);
+                }
             }
 
             @Override

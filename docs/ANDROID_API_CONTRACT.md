@@ -73,6 +73,7 @@ The Android timeline now exposes these controls and lets the server enforce the 
 The home screen opens the WaysGram BotFather screens. The Android app uses the existing authenticated API:
 
 - `GET /api/bots` — list the current user's bots. Tokens are never included in list responses.
+- `GET /api/bots/by-username/{username}` — look up an active public bot by username; the Android BotFather screen uses this to open chats with other users' bots.
 - `POST /api/bots` — create a bot using `name`, `username`, and optional `about`/ `description`. The new token is returned once and shown in the creation screen.
 - `GET /api/bots/{bot_id}` — read owned bot metadata.
 - `GET /api/bots/{bot_id}/commands` and `PUT /api/bots/{bot_id}/commands` — read and replace up to 100 command descriptions.

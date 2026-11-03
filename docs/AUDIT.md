@@ -66,7 +66,7 @@ The Android source repository pins Telegram 13.1.1 (build 7237) as a Git submodu
 
 The login screen now defaults to `https://bot-1793554244-6434-weterochina.bothost.tech`; the field remains editable. This only configures the client's API origin. The hosting domain must still run the AuthBot FastAPI service and proxy the API paths; deployment health has not been confirmed from the source repository.
 
-This is still an early client integration, not feature parity. Media transfer, real-time delivery via push/WebSocket, contacts, calls, full group/channel moderation and membership UI, and the internal BotFather interface remain incomplete. The Android client has not been built into an APK.
+The group/channel timeline now exposes the existing member and administrator routes, and text conversations poll incremental history every four seconds while open. This is HTTP polling, not push/WebSocket delivery. Media transfer, background notifications, contacts, calls, further group/channel administration, and the internal BotFather interface remain incomplete. The Android client has not been built into an APK.
 
 ## 5. Build environment
 

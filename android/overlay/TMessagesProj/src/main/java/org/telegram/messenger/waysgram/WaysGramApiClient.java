@@ -25,7 +25,7 @@ import java.util.concurrent.Executors;
  */
 public final class WaysGramApiClient implements AutoCloseable {
     private static final int CONNECT_TIMEOUT_MS = 15000;
-    private static final int READ_TIMEOUT_MS = 20000;
+    private static final int READ_TIMEOUT_MS = 30000;
     private static final int MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
     private static final int MAX_MEDIA_BYTES = 10 * 1024 * 1024;
 

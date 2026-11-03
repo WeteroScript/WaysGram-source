@@ -8,7 +8,7 @@ The Android login screen defaults to:
 https://bot-1793554244-6434-weterochina.bothost.tech
 ```
 
-The address is editable in the login sheet. A successful login stores the selected API origin and the WaysGram Bearer token together in Android Keystore-backed encrypted preferences. The configured origin is a client default only; it does not establish that the hosting service is deployed or healthy. The host must proxy the root-level `/api/*`, `/health`, and protected `/internal/*` paths to the FastAPI service without stripping the `/api` prefix.
+The address is editable in the login sheet. A successful login stores the selected API origin and the WaysGram Bearer token together in Android Keystore-backed encrypted preferences. The configured origin is a client default only; it does not establish that the hosting service is deployed or healthy. The host must proxy the root-level `/api/*`, `/health`, and protected `/internal/*` paths to the FastAPI service without stripping the `/api` prefix. The login-sheet connection check validates both `GET /health` and public `GET /api/config`; it checks the WaysGram brand, API version and AuthWaysGram delivery readiness before reporting whether code delivery is configured.
 
 ## Authentication
 

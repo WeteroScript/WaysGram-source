@@ -1,6 +1,7 @@
 package org.telegram.messenger.waysgram;
 
 import android.content.Context;
+import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -27,9 +28,13 @@ public final class WaysGramTimelineFragment extends BaseFragment {
 
     private WaysGramApiClient apiClient;
     private LinearLayout messagesContainer;
+    private LinearLayout managementList;
     private EditText messageInput;
+    private EditText managementInput;
     private TextView statusView;
+    private TextView managementStatusView;
     private Button sendButton;
+    private Button managementActionButton;
 
     public WaysGramTimelineFragment(int type, long targetId, String targetTitle) {
         if ((type != TYPE_GROUP && type != TYPE_CHANNEL) || targetId <= 0) {
@@ -64,6 +69,8 @@ public final class WaysGramTimelineFragment extends BaseFragment {
                 ViewGroup.LayoutParams.WRAP_CONTENT
         ));
 
+        buildManagementPanel(context, root);
+
         ScrollView scroll = new ScrollView(context);
         messagesContainer = new LinearLayout(context);
         messagesContainer.setOrientation(LinearLayout.VERTICAL);
@@ -90,6 +97,7 @@ public final class WaysGramTimelineFragment extends BaseFragment {
         ));
         sendButton = new Button(context);
         sendButton.setText(type == TYPE_GROUP ? "Отправить" : "Опубликовать");
+        sendButton.setAllCaps(false);
         composer.addView(sendButton, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
@@ -102,15 +110,86 @@ public final class WaysGramTimelineFragment extends BaseFragment {
 
         Button refreshButton = new Button(context);
         refreshButton.setText("Обновить");
+        refreshButton.setAllCaps(false);
         root.addView(refreshButton, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
         ));
-        refreshButton.setOnClickListener(view -> loadMessages());
+        refreshButton.setOnClickListener(view -> {
+            loadMessages();
+            loadManagement();
+        });
 
         fragmentView = root;
+        loadManagement();
         loadMessages();
         return root;
+    }
+
+    private void buildManagementPanel(Context context, LinearLayout root) {
+        LinearLayout panel = new LinearLayout(context);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(AndroidUtilities.dp(8), AndroidUtilities.dp(5),
+                AndroidUtilities.dp(8), AndroidUtilities.dp(5));
+
+        TextView heading = new TextView(context);
+        heading.setText(type == TYPE_GROUP ? "Участники и права группы" : "Администраторы канала");
+        heading.setTextSize(14);
+        heading.setTypeface(null, android.graphics.Typeface.BOLD);
+        panel.addView(heading, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+
+        managementStatusView = new TextView(context);
+        managementStatusView.setText("Загружаю права доступа…");
+        managementStatusView.setTextSize(12);
+        managementStatusView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
+        panel.addView(managementStatusView, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+
+        managementInput = new EditText(context);
+        managementInput.setSingleLine(true);
+        managementInput.setTextSize(14);
+        managementInput.setHint(type == TYPE_GROUP
+                ? "Telegram ID или username участника"
+                : "Telegram ID нового администратора");
+        if (type == TYPE_CHANNEL) {
+            managementInput.setInputType(InputType.TYPE_CLASS_NUMBER);
+        }
+        panel.addView(managementInput, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+
+        managementActionButton = new Button(context);
+        managementActionButton.setAllCaps(false);
+        managementActionButton.setText(type == TYPE_GROUP ? "Добавить участника" : "Назначить администратора");
+        panel.addView(managementActionButton, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+        managementActionButton.setOnClickListener(view -> {
+            if (type == TYPE_GROUP) {
+                addGroupMember();
+            } else {
+                addChannelAdmin();
+            }
+        });
+
+        managementList = new LinearLayout(context);
+        managementList.setOrientation(LinearLayout.VERTICAL);
+        panel.addView(managementList, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+
+        root.addView(panel, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
     }
 
     private String basePath() {
@@ -144,6 +223,309 @@ public final class WaysGramTimelineFragment extends BaseFragment {
                 }
             }
         });
+    }
+
+    private void loadManagement() {
+        if (type == TYPE_GROUP) {
+            apiClient.get("/api/groups/" + targetId, new WaysGramApiClient.Callback() {
+                @Override
+                public void onSuccess(JSONObject response) {
+                    renderGroupManagement(response);
+                }
+
+                @Override
+                public void onError(String message, int statusCode) {
+                    managementStatusView.setText(message);
+                    managementActionButton.setEnabled(false);
+                    if (statusCode == 401) {
+                        WaysGramSessionStore.getInstance(getParentActivity()).clearSession();
+                        presentFragment(new WaysGramLoginFragment(), true);
+                    }
+                }
+            });
+        } else {
+            apiClient.get("/api/channels/" + targetId + "/admins", new WaysGramApiClient.Callback() {
+                @Override
+                public void onSuccess(JSONObject response) {
+                    renderChannelManagement(response);
+                }
+
+                @Override
+                public void onError(String message, int statusCode) {
+                    managementStatusView.setText(message);
+                    managementActionButton.setEnabled(false);
+                    if (statusCode == 401) {
+                        WaysGramSessionStore.getInstance(getParentActivity()).clearSession();
+                        presentFragment(new WaysGramLoginFragment(), true);
+                    }
+                }
+            });
+        }
+    }
+
+    private void renderGroupManagement(JSONObject group) {
+        String myRole = group.optString("my_role", "member");
+        JSONArray members = group.optJSONArray("members");
+        int count = members == null ? 0 : members.length();
+        managementStatusView.setText("Ваша роль: " + roleLabel(myRole) + " · участников: " + count);
+        managementActionButton.setEnabled("owner".equals(myRole) || "admin".equals(myRole));
+        managementList.removeAllViews();
+
+        int visible = Math.min(count, 40);
+        for (int i = 0; i < visible; i++) {
+            JSONObject member = members.optJSONObject(i);
+            if (member == null) {
+                continue;
+            }
+            long memberId = member.optLong("telegram_id", 0);
+            String role = member.optString("role", "member");
+            String name = member.optString("display_name", "");
+            if (name.length() == 0) {
+                name = member.optString("username", "");
+            }
+            if (name.length() == 0) {
+                name = "Пользователь";
+            }
+            TextView label = managementLabel(name + " · ID " + memberId + " · " + roleLabel(role));
+            managementList.addView(label, matchWrap());
+
+            boolean manager = "owner".equals(myRole) || "admin".equals(myRole);
+            if (manager && !"owner".equals(role)) {
+                LinearLayout actions = new LinearLayout(getParentActivity());
+                actions.setOrientation(LinearLayout.HORIZONTAL);
+                if ("owner".equals(myRole)) {
+                    if ("admin".equals(role)) {
+                        addSmallButton(actions, "Снять админа", () -> changeGroupAdmin(memberId, false));
+                    } else {
+                        addSmallButton(actions, "Назначить админом", () -> changeGroupAdmin(memberId, true));
+                    }
+                }
+                addSmallButton(actions, "Удалить", () -> removeGroupMember(memberId));
+                managementList.addView(actions, matchWrap());
+            }
+        }
+        if (count > visible) {
+            managementList.addView(managementLabel("Показаны первые " + visible + " участников."));
+        }
+    }
+
+    private void renderChannelManagement(JSONObject channel) {
+        String myRole = channel.optString("my_role", "member");
+        JSONArray admins = channel.optJSONArray("admins");
+        int count = admins == null ? 0 : admins.length();
+        boolean owner = "owner".equals(myRole);
+        managementStatusView.setText(owner
+                ? "Вы владелец канала · администраторов: " + count
+                : "Ваша роль: " + roleLabel(myRole));
+        managementActionButton.setEnabled(owner);
+        managementList.removeAllViews();
+
+        if (count == 0) {
+            managementList.addView(managementLabel("Администраторов пока нет."));
+            return;
+        }
+        for (int i = 0; i < count && i < 40; i++) {
+            JSONObject admin = admins.optJSONObject(i);
+            if (admin == null) {
+                continue;
+            }
+            long adminId = admin.optLong("telegram_id", 0);
+            String name = admin.optString("display_name", "");
+            if (name.length() == 0) {
+                name = admin.optString("username", "");
+            }
+            if (name.length() == 0) {
+                name = "Пользователь";
+            }
+            managementList.addView(managementLabel(name + " · ID " + adminId));
+            if (owner) {
+                LinearLayout actions = new LinearLayout(getParentActivity());
+                actions.setOrientation(LinearLayout.HORIZONTAL);
+                addSmallButton(actions, "Снять администратора", () -> removeChannelAdmin(adminId));
+                managementList.addView(actions, matchWrap());
+            }
+        }
+    }
+
+    private void addGroupMember() {
+        String value = managementInput.getText() == null ? "" : managementInput.getText().toString().trim();
+        if (value.startsWith("@")) {
+            value = value.substring(1);
+        }
+        if (value.isEmpty()) {
+            managementStatusView.setText("Введите Telegram ID или username.");
+            return;
+        }
+        JSONObject payload = new JSONObject();
+        try {
+            if (value.matches("[0-9]{1,20}")) {
+                payload.put("telegram_id", Long.parseLong(value));
+            } else {
+                payload.put("username", value);
+            }
+        } catch (Exception exception) {
+            managementStatusView.setText("Некорректный Telegram ID.");
+            return;
+        }
+        managementActionButton.setEnabled(false);
+        apiClient.post("/api/groups/" + targetId + "/members", payload, new WaysGramApiClient.Callback() {
+            @Override
+            public void onSuccess(JSONObject response) {
+                managementInput.setText("");
+                managementStatusView.setText(response.optBoolean("joined", false)
+                        ? "Участник добавлен."
+                        : "Этот пользователь уже состоит в группе.");
+                loadManagement();
+            }
+
+            @Override
+            public void onError(String message, int statusCode) {
+                managementStatusView.setText(message);
+                managementActionButton.setEnabled(true);
+            }
+        });
+    }
+
+    private void changeGroupAdmin(long memberId, boolean promote) {
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("telegram_id", memberId);
+        } catch (Exception exception) {
+            managementStatusView.setText("Не удалось подготовить запрос.");
+            return;
+        }
+        String path = "/api/groups/" + targetId + "/admins";
+        if (promote) {
+            apiClient.post(path, payload, new WaysGramApiClient.Callback() {
+                @Override
+                public void onSuccess(JSONObject response) {
+                    managementStatusView.setText("Права администратора выданы.");
+                    loadManagement();
+                }
+
+                @Override
+                public void onError(String message, int statusCode) {
+                    managementStatusView.setText(message);
+                }
+            });
+        } else {
+            apiClient.delete(path + "/" + memberId, new WaysGramApiClient.Callback() {
+                @Override
+                public void onSuccess(JSONObject response) {
+                    managementStatusView.setText("Права администратора сняты.");
+                    loadManagement();
+                }
+
+                @Override
+                public void onError(String message, int statusCode) {
+                    managementStatusView.setText(message);
+                }
+            });
+        }
+    }
+
+    private void removeGroupMember(long memberId) {
+        apiClient.delete("/api/groups/" + targetId + "/members/" + memberId,
+                new WaysGramApiClient.Callback() {
+                    @Override
+                    public void onSuccess(JSONObject response) {
+                        managementStatusView.setText("Участник удалён.");
+                        loadManagement();
+                    }
+
+                    @Override
+                    public void onError(String message, int statusCode) {
+                        managementStatusView.setText(message);
+                    }
+                });
+    }
+
+    private void addChannelAdmin() {
+        String value = managementInput.getText() == null ? "" : managementInput.getText().toString().trim();
+        if (!value.matches("[0-9]{1,20}")) {
+            managementStatusView.setText("Введите числовой Telegram ID пользователя.");
+            return;
+        }
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("telegram_id", Long.parseLong(value));
+        } catch (Exception exception) {
+            managementStatusView.setText("Некорректный Telegram ID.");
+            return;
+        }
+        managementActionButton.setEnabled(false);
+        apiClient.post("/api/channels/" + targetId + "/admins", payload, new WaysGramApiClient.Callback() {
+            @Override
+            public void onSuccess(JSONObject response) {
+                managementInput.setText("");
+                managementStatusView.setText("Администратор назначен.");
+                loadManagement();
+            }
+
+            @Override
+            public void onError(String message, int statusCode) {
+                managementStatusView.setText(message);
+                managementActionButton.setEnabled(true);
+            }
+        });
+    }
+
+    private void removeChannelAdmin(long adminId) {
+        apiClient.delete("/api/channels/" + targetId + "/admins/" + adminId,
+                new WaysGramApiClient.Callback() {
+                    @Override
+                    public void onSuccess(JSONObject response) {
+                        managementStatusView.setText("Администратор снят.");
+                        loadManagement();
+                    }
+
+                    @Override
+                    public void onError(String message, int statusCode) {
+                        managementStatusView.setText(message);
+                    }
+                });
+    }
+
+    private TextView managementLabel(String value) {
+        TextView label = new TextView(getParentActivity());
+        label.setText(value);
+        label.setTextSize(12);
+        label.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
+        label.setPadding(AndroidUtilities.dp(4), AndroidUtilities.dp(4),
+                AndroidUtilities.dp(4), AndroidUtilities.dp(4));
+        return label;
+    }
+
+    private LinearLayout.LayoutParams matchWrap() {
+        return new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+    }
+
+    private void addSmallButton(LinearLayout parent, String title, Runnable action) {
+        Button button = new Button(getParentActivity());
+        button.setText(title);
+        button.setTextSize(11);
+        button.setAllCaps(false);
+        button.setOnClickListener(view -> action.run());
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        params.rightMargin = AndroidUtilities.dp(5);
+        parent.addView(button, params);
+    }
+
+    private String roleLabel(String role) {
+        switch (role) {
+            case "owner":
+                return "владелец";
+            case "admin":
+                return "администратор";
+            default:
+                return "участник";
+        }
     }
 
     private void addMessage(JSONObject message) {

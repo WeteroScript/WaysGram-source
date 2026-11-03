@@ -52,6 +52,7 @@ public final class WaysGramTimelineFragment extends BaseFragment {
     };
     private long lastMessageId = 0;
     private boolean pollInFlight = false;
+    private boolean isScreenResumed = false;
     private Button managementActionButton;
 
     public WaysGramTimelineFragment(int type, long targetId, String targetTitle) {
@@ -346,14 +347,14 @@ public final class WaysGramTimelineFragment extends BaseFragment {
     }
 
     private void scheduleNextPoll() {
-        if (apiClient != null) {
+        if (apiClient != null && isScreenResumed) {
             pollHandler.removeCallbacks(pollRunnable);
             pollHandler.postDelayed(pollRunnable, 4000);
         }
     }
 
     private void pollNewMessages() {
-        if (apiClient == null || pollInFlight) {
+        if (apiClient == null || !isScreenResumed || pollInFlight) {
             return;
         }
         pollInFlight = true;
@@ -794,7 +795,23 @@ public final class WaysGramTimelineFragment extends BaseFragment {
     }
 
     @Override
+    public void onResume() {
+        super.onResume();
+        isScreenResumed = true;
+        pollHandler.removeCallbacks(pollRunnable);
+        pollNewMessages();
+    }
+
+    @Override
+    public void onPause() {
+        isScreenResumed = false;
+        pollHandler.removeCallbacks(pollRunnable);
+        super.onPause();
+    }
+
+    @Override
     public void onFragmentDestroy() {
+        isScreenResumed = false;
         pollHandler.removeCallbacks(pollRunnable);
         if (apiClient != null) {
             apiClient.close();

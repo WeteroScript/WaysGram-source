@@ -49,8 +49,11 @@ The current Android overlay calls these API areas:
 - Channels: `GET /api/channels`, `POST /api/channels`, channel history and text-post routes.
 - Telegram gift catalogue: `GET /api/telegram/gifts`.
 - Gift stickers: `GET /api/telegram/gifts/{gift_id}/sticker`.
+- Image upload: `POST /api/media/images`.
+- Document upload: `POST /api/media/documents` for PDF, TXT, and CSV.
+- Authenticated attachment download: `GET /api/media/{media_id}`.
 
-The Android screens now support text and static image attachments in direct messages and group/channel timelines. Animated images, video, documents, push/WebSocket delivery, calls, and background notifications are not implemented.
+Direct messages and group/channel timelines support text, static image, and PDF/TXT/CSV attachments. Message history and send responses expose `media_id`, `media_type`, and `media_name` for attachments. Images render inline; documents are saved through Android's system document picker. The backend returns documents with `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff`. Animated images, video, push/WebSocket delivery, calls, and background notifications are not implemented.
 
 ## Group and channel management
 

@@ -1,11 +1,13 @@
 package org.telegram.messenger.waysgram;
 
 import android.content.ContentResolver;
+import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.OpenableColumns;
 
 import org.json.JSONObject;
 
@@ -15,6 +17,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLEncoder;
+import java.util.Locale;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -37,6 +41,33 @@ public final class WaysGramApiClient implements AutoCloseable {
     public interface ImageCallback {
         void onSuccess(Bitmap bitmap);
         void onError(String message, int statusCode);
+    }
+
+    public void uploadDocument(ContentResolver resolver, Uri uri, Callback callback) {
+        ioExecutor.execute(() -> {
+            try {
+                JSONObject response = performDocumentUpload(resolver, uri);
+                deliverSuccess(callback, response);
+            } catch (ApiException exception) {
+                deliverError(callback, exception.getMessage(), exception.statusCode);
+            } catch (Exception exception) {
+                deliverError(callback, "Не удалось загрузить документ", 0);
+            }
+        });
+    }
+
+    public void downloadDocumentToUri(ContentResolver resolver, Uri destination,
+                                      String mediaId, Callback callback) {
+        ioExecutor.execute(() -> {
+            try {
+                JSONObject response = performDocumentDownloadToUri(resolver, destination, mediaId);
+                deliverSuccess(callback, response);
+            } catch (ApiException exception) {
+                deliverError(callback, exception.getMessage(), exception.statusCode);
+            } catch (Exception exception) {
+                deliverError(callback, "Не удалось сохранить документ", 0);
+            }
+        });
     }
 
     private final WaysGramSessionStore sessionStore;
@@ -165,6 +196,142 @@ public final class WaysGramApiClient implements AutoCloseable {
                 connection.disconnect();
             }
         }
+    }
+
+
+    private JSONObject performDocumentUpload(ContentResolver resolver, Uri uri) throws Exception {
+        if (resolver == null || uri == null) {
+            throw new IOException("Не выбран документ");
+        }
+        String filename = queryDisplayName(resolver, uri);
+        String lowerName = filename.toLowerCase(Locale.ROOT);
+        String mimeType;
+        if (lowerName.endsWith(".pdf")) {
+            mimeType = "application/pdf";
+        } else if (lowerName.endsWith(".txt")) {
+            mimeType = "text/plain";
+        } else if (lowerName.endsWith(".csv")) {
+            mimeType = "text/csv";
+        } else {
+            throw new IOException("Поддерживаются только PDF, TXT и CSV");
+        }
+
+        byte[] content;
+        try (InputStream input = resolver.openInputStream(uri)) {
+            if (input == null) {
+                throw new IOException("Не удалось открыть выбранный документ");
+            }
+            content = readLimited(input, MAX_MEDIA_BYTES);
+        }
+        if (content.length == 0) {
+            throw new IOException("Документ пуст");
+        }
+        String encodedName = URLEncoder.encode(filename, StandardCharsets.UTF_8.name())
+                .replace("+", "%20");
+        String baseUrl = sessionStore.getApiBaseUrl();
+        String token = sessionStore.getWaysGramSessionToken();
+        if (baseUrl == null || token == null || token.length() == 0) {
+            throw new IOException("Нет активной сессии WaysGram");
+        }
+
+        HttpURLConnection connection = null;
+        try {
+            connection = (HttpURLConnection) new URL(baseUrl + "/api/media/documents").openConnection();
+            connection.setRequestMethod("POST");
+            connection.setInstanceFollowRedirects(false);
+            connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
+            connection.setReadTimeout(READ_TIMEOUT_MS);
+            connection.setDoOutput(true);
+            connection.setRequestProperty("Accept", "application/json");
+            connection.setRequestProperty("Authorization", "Bearer " + token);
+            connection.setRequestProperty("Content-Type", mimeType);
+            connection.setRequestProperty("X-Filename", encodedName);
+            connection.setFixedLengthStreamingMode(content.length);
+            try (OutputStream output = connection.getOutputStream()) {
+                output.write(content);
+            }
+            int status = connection.getResponseCode();
+            InputStream stream = status >= 200 && status < 300
+                    ? connection.getInputStream()
+                    : connection.getErrorStream();
+            byte[] responseBytes = stream == null ? new byte[0] : readLimited(stream, MAX_RESPONSE_BYTES);
+            JSONObject response = parseJsonResponse(responseBytes);
+            if (status < 200 || status >= 300) {
+                throw new ApiException(status, safeApiMessage(response, status));
+            }
+            return response;
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
+    }
+
+    private JSONObject performDocumentDownloadToUri(ContentResolver resolver, Uri destination,
+                                                      String mediaId) throws Exception {
+        if (resolver == null || destination == null
+                || mediaId == null || !mediaId.matches("[a-f0-9]{32}")) {
+            throw new IOException("Некорректный адрес сохранения документа");
+        }
+        String baseUrl = sessionStore.getApiBaseUrl();
+        String token = sessionStore.getWaysGramSessionToken();
+        if (baseUrl == null || token == null || token.length() == 0) {
+            throw new IOException("Нет активной сессии WaysGram");
+        }
+
+        HttpURLConnection connection = null;
+        try {
+            connection = (HttpURLConnection) new URL(baseUrl + "/api/media/" + mediaId).openConnection();
+            connection.setRequestMethod("GET");
+            connection.setInstanceFollowRedirects(false);
+            connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
+            connection.setReadTimeout(READ_TIMEOUT_MS);
+            connection.setRequestProperty("Accept", "application/pdf,text/plain,text/csv");
+            connection.setRequestProperty("Authorization", "Bearer " + token);
+            int status = connection.getResponseCode();
+            if (status < 200 || status >= 300) {
+                InputStream error = connection.getErrorStream();
+                byte[] errorBytes = error == null ? new byte[0] : readLimited(error, MAX_RESPONSE_BYTES);
+                JSONObject errorJson = parseJsonResponse(errorBytes);
+                throw new ApiException(status, safeApiMessage(errorJson, status));
+            }
+            byte[] bytes = readLimited(connection.getInputStream(), MAX_MEDIA_BYTES);
+            try (OutputStream output = resolver.openOutputStream(destination, "w")) {
+                if (output == null) {
+                    throw new IOException("Не удалось открыть место сохранения документа");
+                }
+                output.write(bytes);
+                output.flush();
+            }
+            JSONObject result = new JSONObject();
+            result.put("saved_bytes", bytes.length);
+            return result;
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
+    }
+
+    private static String queryDisplayName(ContentResolver resolver, Uri uri) {
+        if (resolver != null && uri != null) {
+            try (Cursor cursor = resolver.query(uri,
+                    new String[]{OpenableColumns.DISPLAY_NAME}, null, null, null)) {
+                if (cursor != null && cursor.moveToFirst()) {
+                    int index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                    if (index >= 0) {
+                        String value = cursor.getString(index);
+                        if (value != null && value.trim().length() > 0) {
+                            return value.trim();
+                        }
+                    }
+                }
+            } catch (Exception ignored) {
+                // Fall back to the URI's last path segment.
+            }
+        }
+        String fallback = uri == null ? "document.pdf" : uri.getLastPathSegment();
+        return fallback == null || fallback.trim().length() == 0 ? "document.pdf" : fallback;
     }
 
     private Bitmap performImageDownload(String mediaId) throws IOException {

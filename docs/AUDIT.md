@@ -41,36 +41,32 @@ The Android source also includes `GiftAuctionController.java`, but its state and
 
 Therefore the full catalogue cannot be reconstructed from this ZIP alone. The actual source catalogue data (or an authorized export containing gift IDs, names, image assets, prices, supplies and auction eligibility) is still required.
 
-## 4. Telegram gift catalog source
+## 4. Telegram gift catalog source and WaysGram integration
 
-The supplied Android client confirms the original Telegram implementation path:
+The supplied Telegram Android client obtains its StarGift list through MTProto:
+- `StarsController.loadStarGifts()` restores the local cache.
+- `StarsController.getStarGiftsRemote(hash)` sends `TL_stars.getStarGifts`, corresponding to `payments.getStarGifts`.
 
-- `StarsController.loadStarGifts()` restores the local `star_gifts2` cache and refreshes it when its one-minute freshness window expires.
-- `StarsController.getStarGiftsRemote(hash)` sends `TL_stars.getStarGifts` through `ConnectionsManager`.
-- This is the MTProto method `payments.getStarGifts`; it returns the client's StarGift objects and associated user/chat metadata.
+AuthBot now has a bot-authenticated MTProto implementation in `telegram_mtproto.py`. When `TELEGRAM_API_ID` and `TELEGRAM_API_HASH` are configured, it creates a Telethon client with `start(bot_token=BOT_TOKEN)`, verifies that the authenticated identity is a bot, and requests `functions.payments.GetStarGiftsRequest(hash=0)`. It stores the returned metadata, including Telegram Stars price, supply/limited flags, sticker document metadata, upgrade/resale fields and auction metadata where present.
 
-WaysGram AuthBot now has a separate server-side catalog integration using the official Telegram Bot API method `getAvailableGifts`:
+The Android app does not authenticate a Telegram user to retrieve this catalogue. It calls the WaysGram API instead:
+- `GET /api/telegram/gifts` — authenticated catalogue response.
+- `GET /api/telegram/gifts/{gift_id}/sticker` — authenticated sticker proxy; the MTProto bot session and document credentials remain server-side.
+- `POST /internal/v1/telegram/gifts/sync` — forced refresh protected by `X-Internal-Token`.
 
-- `GET /api/telegram/gifts` — authenticated WaysGram client route; refreshes the cache when it is older than 60 seconds.
-- `GET /api/telegram/gifts/{gift_id}/sticker` — authenticated server-side sticker proxy. The AuthBot token and Telegram `file_id` remain server-side.
-- `POST /internal/v1/telegram/gifts/sync` — protected server-side forced refresh; requires `X-Internal-Token`.
-- Initial catalog sync runs when AuthBot starts. A stale cached snapshot remains available if Telegram's API is temporarily unreachable.
+If bot-authenticated MTProto is not configured or is unavailable, AuthBot falls back to Bot API `getAvailableGifts`. That fallback is limited to gifts the configured bot can send and is not the complete MTProto catalogue. Telegram Stars remain a separate currency from internal WaysGram Stars and Gram.
 
-The Bot API method returns the gifts that the configured AuthBot may send. It is intentionally a bot-scoped subset, not a complete replacement for the Android client's MTProto `payments.getStarGifts` result. The Bot API catalog does not expose all MTProto-only gift titles, auction state, resale entries, or collectible attributes. A future full MTProto import would require a separate bot-authenticated MTProto client configured with Telegram API ID/hash; it must not require users to share their personal Telegram login codes or sessions.
-
-Telegram's `star_count` remains `telegram_stars`. It is not converted into internal WaysGram Stars or Gram. The imported catalog is stored separately from WaysGram's internal `gift_catalog` and is read-only in this integration.
-
-The source repository pins the official Android tree as submodule `android/telegram-upstream` at Telegram 13.1.1 (build 7237). WaysGram overlays now include:
-
-- `WaysGramSessionStore`: Android Keystore AES-GCM storage for the WaysGram API base URL and bearer session token.
-- `WaysGramAuthClient` and `WaysGramLoginSheet`: virtual +1 number / AuthWaysGram_bot OTP request and verification against `/api/auth/request-code` and `/api/auth/verify-code`. No Telegram personal login codes or account sessions are used.
-- `WaysGramLoginFragment` and `WaysGramHomeFragment`: initial sign-in page and API-backed profile/wallet view.
+The Android source repository pins Telegram 13.1.1 (build 7237) as a Git submodule and adds these WaysGram overlays:
+- `WaysGramSessionStore`: Android Keystore-backed encryption for the WaysGram API origin and session token.
+- `WaysGramAuthClient` and `WaysGramLoginSheet`: virtual-number sign-in and one-time code verification through AuthBot.
+- `WaysGramLoginFragment` and `WaysGramHomeFragment`: login, profile and wallet screens.
 - `WaysGramApiClient`: authenticated JSON REST client.
-- `WaysGramDirectoryFragment` and `WaysGramChatFragment`: conversation list and direct text messages through the private WaysGram API.
-- `WaysGramTimelineFragment`: group/channel text histories and posting.
-- `WaysGramGiftCatalogClient` and `WaysGramGiftCatalogSheet`: read-only MTProto gift catalog presentation and sticker proxy.
+- `WaysGramDirectoryFragment`, `WaysGramChatFragment`, and `WaysGramTimelineFragment`: user search, initial group/channel creation, and text-based messaging views.
+- `WaysGramGiftCatalogClient` and `WaysGramGiftCatalogSheet`: read-only MTProto catalogue and sticker proxy UI.
 
-The source-preparation patcher changes the upstream `LaunchActivity` startup fragment choice to open WaysGram login or home based on the WaysGram session. It also adds a separate WaysGram catalog entry to the original `GiftSheet`. This is an early UI/API slice, not full client parity: media, push/WebSocket delivery, contacts, calls, full group/channel creation and management, bot management UI, and remaining Telegram-backed screens still require migration. No APK has been built.
+The login screen now defaults to `https://bot-1793554244-6434-weterochina.bothost.tech`; the field remains editable. This only configures the client's API origin. The hosting domain must still run the AuthBot FastAPI service and proxy the API paths; deployment health has not been confirmed from the source repository.
+
+This is still an early client integration, not feature parity. Media transfer, real-time delivery via push/WebSocket, contacts, calls, full group/channel moderation and membership UI, and the internal BotFather interface remain incomplete. The Android client has not been built into an APK.
 
 ## 5. Build environment
 
@@ -101,7 +97,7 @@ The AuthBot backend now includes text group chats with owner/admin/member roles,
 - New accounts receive one-time opening balances of 5,000 internal Stars and 15 internal Gram; subsequent profile syncs do not repeat the grant.
 - Admin gift list renamed to "Подарки" and supports pagination through all database records.
 - Admin can create and cancel system gift auctions. Auction gifts are reserved from catalogue supply.
-- Telegram's bot-scoped gift catalog is fetched using Bot API `getAvailableGifts`, cached for 60 seconds and exposed through authenticated catalog/sticker-proxy routes.
+- Telegram gift catalogue is fetched primarily through bot-authenticated MTProto `payments.getStarGifts`; Bot API `getAvailableGifts` is only a limited fallback. The catalogue and sticker proxy are exposed through authenticated routes.
 - API supports listing auctions and placing Stars bids. A higher bid refunds the previous leader; after the auction end, the next auction-list request settles the auction and transfers the reserved gift to the winner. If there are no bids, supply is restored.
 - Termux helper script and setup instructions were added.
 
@@ -109,10 +105,12 @@ GitHub Actions test runs for the latest AuthBot changes are linked from the repo
 
 ## 8. Remaining work before a functional APK
 
-1. Connect `WaysGramGiftCatalogClient` to the existing gift screen/controller and inject the WaysGram API base URL plus Bearer session.
-2. Replace MTProto authentication with AuthBot login while preserving the screen layout.
-3. Replace the remaining Telegram server-dependent profile, messaging, contact, group, channel and balance calls with the private WaysGram API; keep the gift catalog's Bot API source clearly separated from Telegram-only data.
-4. Complete the Android UI/API integration for groups and BotFather; add a controlled bot runtime or webhook mechanism only after the security model is designed.
-5. Wire the Android gift UI to `GET /api/telegram/gifts` and render its authenticated sticker-proxy URLs. The current source provides the Bot API subset; a full MTProto-only catalogue remains a separate, optional integration.
-6. Set an app package ID, signing configuration, own icon and own app/service credentials.
-7. Add Android CI, build and install APK, then perform end-to-end tests against the backend.
+1. Verify the hosting domain runs the AuthBot FastAPI service and correctly proxies `/api/*`, `/health`, and protected `/internal/*` paths.
+2. Run end-to-end checks for virtual-number sign-in, session persistence, profile/wallet, user lookup, direct messages, group creation, channel creation, text histories and Telegram gift/sticker retrieval.
+3. Add reliable real-time delivery (WebSocket or push) and reconnect/history synchronization.
+4. Implement media upload and delivery, contacts, calls, full group/channel member and moderation screens, and the internal BotFather UI.
+5. Review and complete authorization, rate limits, observability, database backup and production deployment hardening.
+6. Set the independent app package ID, signing configuration, app icon and app/service credentials.
+7. Add Android build CI and perform APK build/install tests only after the source/API integration milestones are complete.
+
+Stake-based auction functionality is not part of the Android integration milestone. The client marketplace scope should use fixed-price listings and inventory operations.

@@ -1,6 +1,8 @@
 package org.telegram.messenger.waysgram;
 
 import android.content.Context;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -26,6 +28,15 @@ public final class WaysGramChatFragment extends BaseFragment {
     private LinearLayout messagesContainer;
     private EditText messageInput;
     private TextView statusView;
+    private final Handler pollHandler = new Handler(Looper.getMainLooper());
+    private final Runnable pollRunnable = new Runnable() {
+        @Override
+        public void run() {
+            pollNewMessages();
+        }
+    };
+    private long lastMessageId = 0;
+    private boolean pollInFlight = false;
 
     public WaysGramChatFragment(long peerId, String peerTitle) {
         if (peerId <= 0) {
@@ -116,13 +127,17 @@ public final class WaysGramChatFragment extends BaseFragment {
                 JSONArray messages = response.optJSONArray("messages");
                 messagesContainer.removeAllViews();
                 int count = messages == null ? 0 : messages.length();
+                long newestId = lastMessageId;
                 for (int i = 0; i < count; i++) {
                     JSONObject message = messages.optJSONObject(i);
                     if (message != null) {
                         addMessage(message);
+                        newestId = Math.max(newestId, message.optLong("id", 0));
                     }
                 }
+                lastMessageId = newestId;
                 statusView.setText(count == 0 ? "История пока пуста" : "Сообщений: " + count);
+                scheduleNextPoll();
             }
 
             @Override
@@ -131,9 +146,59 @@ public final class WaysGramChatFragment extends BaseFragment {
                 if (statusCode == 401) {
                     WaysGramSessionStore.getInstance(getParentActivity()).clearSession();
                     presentFragment(new WaysGramLoginFragment(), true);
+                } else {
+                    scheduleNextPoll();
                 }
             }
         });
+    }
+
+    private void scheduleNextPoll() {
+        if (apiClient != null) {
+            pollHandler.removeCallbacks(pollRunnable);
+            pollHandler.postDelayed(pollRunnable, 4000);
+        }
+    }
+
+    private void pollNewMessages() {
+        if (apiClient == null || pollInFlight) {
+            return;
+        }
+        pollInFlight = true;
+        apiClient.get("/api/messages?with=" + peerId + "&after_id=" + lastMessageId,
+                new WaysGramApiClient.Callback() {
+                    @Override
+                    public void onSuccess(JSONObject response) {
+                        pollInFlight = false;
+                        JSONArray messages = response.optJSONArray("messages");
+                        int count = messages == null ? 0 : messages.length();
+                        for (int i = 0; i < count; i++) {
+                            JSONObject message = messages.optJSONObject(i);
+                            if (message != null) {
+                                long messageId = message.optLong("id", 0);
+                                if (messageId > lastMessageId) {
+                                    addMessage(message);
+                                    lastMessageId = messageId;
+                                }
+                            }
+                        }
+                        if (count > 0) {
+                            statusView.setText("Новые сообщения: " + count);
+                        }
+                        scheduleNextPoll();
+                    }
+
+                    @Override
+                    public void onError(String message, int statusCode) {
+                        pollInFlight = false;
+                        if (statusCode == 401) {
+                            WaysGramSessionStore.getInstance(getParentActivity()).clearSession();
+                            presentFragment(new WaysGramLoginFragment(), true);
+                        } else {
+                            scheduleNextPoll();
+                        }
+                    }
+                });
     }
 
     private void addMessage(JSONObject message) {
@@ -185,6 +250,7 @@ public final class WaysGramChatFragment extends BaseFragment {
 
     @Override
     public void onFragmentDestroy() {
+        pollHandler.removeCallbacks(pollRunnable);
         if (apiClient != null) {
             apiClient.close();
             apiClient = null;

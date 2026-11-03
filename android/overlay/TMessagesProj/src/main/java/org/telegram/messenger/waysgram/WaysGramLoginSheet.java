@@ -33,8 +33,10 @@ public final class WaysGramLoginSheet extends BottomSheet {
     private final EditText virtualNumberInput;
     private final EditText codeInput;
     private final TextView statusView;
+    private final Button checkServerButton;
     private final Button requestCodeButton;
     private final Button verifyButton;
+    private boolean codeRequested;
 
     public WaysGramLoginSheet(
             Context context,
@@ -93,6 +95,13 @@ public final class WaysGramLoginSheet extends BottomSheet {
         apiBaseInput.setText(savedBase != null ? savedBase : DEFAULT_API_BASE_URL);
         apiBaseInput.setSingleLine(true);
 
+        checkServerButton = new Button(context);
+        checkServerButton.setText("Проверить соединение с сервером");
+        content.addView(checkServerButton, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+
         virtualNumberInput = addField(
                 context,
                 content,
@@ -137,6 +146,7 @@ public final class WaysGramLoginSheet extends BottomSheet {
         ));
 
         setCustomView(content);
+        checkServerButton.setOnClickListener(view -> checkServer());
         requestCodeButton.setOnClickListener(view -> requestCode());
         verifyButton.setOnClickListener(view -> verifyCode());
         verifyButton.setEnabled(false);
@@ -178,6 +188,41 @@ public final class WaysGramLoginSheet extends BottomSheet {
                 : virtualNumberInput.getText().toString().trim();
     }
 
+    private void checkServer() {
+        String base = apiBaseInput.getText() == null
+                ? ""
+                : apiBaseInput.getText().toString().trim();
+        if (base.length() == 0) {
+            statusView.setText("Укажите адрес WaysGram API.");
+            return;
+        }
+
+        codeRequested = false;
+        closeClient();
+        try {
+            authClient = new WaysGramAuthClient(base, sessionStore);
+        } catch (IllegalArgumentException exception) {
+            statusView.setText(exception.getMessage());
+            return;
+        }
+
+        setBusy(true);
+        statusView.setText("Проверяю доступность WaysGram API…");
+        authClient.checkServer(new WaysGramAuthClient.Callback() {
+            @Override
+            public void onSuccess(org.json.JSONObject response) {
+                setBusy(false);
+                statusView.setText("Сервер WaysGram доступен. API отвечает корректно.");
+            }
+
+            @Override
+            public void onError(String message) {
+                setBusy(false);
+                statusView.setText("Сервер WaysGram недоступен: " + message);
+            }
+        });
+    }
+
     private void requestCode() {
         String number = getNumber();
         String base = apiBaseInput.getText() == null
@@ -187,6 +232,8 @@ public final class WaysGramLoginSheet extends BottomSheet {
             statusView.setText("Заполните адрес API и внутренний номер.");
             return;
         }
+        codeRequested = false;
+        verifyButton.setEnabled(false);
         closeClient();
         try {
             authClient = new WaysGramAuthClient(base, sessionStore);
@@ -200,8 +247,8 @@ public final class WaysGramLoginSheet extends BottomSheet {
         authClient.requestCode(number, new WaysGramAuthClient.Callback() {
             @Override
             public void onSuccess(org.json.JSONObject response) {
+                codeRequested = true;
                 setBusy(false);
-                verifyButton.setEnabled(true);
                 statusView.setText(
                         "Запрос принят. Откройте AuthWaysGram_bot и нажмите «Получить код», затем введите его здесь."
                 );
@@ -220,7 +267,7 @@ public final class WaysGramLoginSheet extends BottomSheet {
         String code = codeInput.getText() == null
                 ? ""
                 : codeInput.getText().toString().trim();
-        if (authClient == null) {
+        if (authClient == null || !codeRequested) {
             statusView.setText("Сначала запросите код.");
             return;
         }
@@ -252,8 +299,9 @@ public final class WaysGramLoginSheet extends BottomSheet {
     }
 
     private void setBusy(boolean busy) {
+        checkServerButton.setEnabled(!busy);
         requestCodeButton.setEnabled(!busy);
-        verifyButton.setEnabled(!busy && authClient != null);
+        verifyButton.setEnabled(!busy && codeRequested);
         apiBaseInput.setEnabled(!busy);
         virtualNumberInput.setEnabled(!busy);
         codeInput.setEnabled(!busy);

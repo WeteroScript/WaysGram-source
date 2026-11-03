@@ -192,9 +192,15 @@ public final class WaysGramTimelineFragment extends BaseFragment {
 
         managementList = new LinearLayout(context);
         managementList.setOrientation(LinearLayout.VERTICAL);
-        panel.addView(managementList, new LinearLayout.LayoutParams(
+        ScrollView managementScroll = new ScrollView(context);
+        managementScroll.setFillViewport(false);
+        managementScroll.addView(managementList, new ScrollView.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+        panel.addView(managementScroll, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                AndroidUtilities.dp(150)
         ));
 
         root.addView(panel, new LinearLayout.LayoutParams(
@@ -334,6 +340,10 @@ public final class WaysGramTimelineFragment extends BaseFragment {
         managementStatusView.setText("Ваша роль: " + roleLabel(myRole) + " · участников: " + count);
         managementActionButton.setEnabled("owner".equals(myRole) || "admin".equals(myRole));
         managementList.removeAllViews();
+        long myId = group.optLong("my_telegram_id", 0);
+        if (!"owner".equals(myRole) && myId > 0) {
+            addSmallButton(managementList, "Покинуть группу", () -> leaveGroup(myId));
+        }
 
         int visible = Math.min(count, 40);
         for (int i = 0; i < visible; i++) {
@@ -486,6 +496,24 @@ public final class WaysGramTimelineFragment extends BaseFragment {
                 }
             });
         }
+    }
+
+    private void leaveGroup(long myId) {
+        apiClient.delete("/api/groups/" + targetId + "/members/" + myId,
+                new WaysGramApiClient.Callback() {
+                    @Override
+                    public void onSuccess(JSONObject response) {
+                        managementStatusView.setText("Вы покинули группу.");
+                        presentFragment(new WaysGramDirectoryFragment(
+                                WaysGramDirectoryFragment.TYPE_GROUPS
+                        ), true);
+                    }
+
+                    @Override
+                    public void onError(String message, int statusCode) {
+                        managementStatusView.setText(message);
+                    }
+                });
     }
 
     private void removeGroupMember(long memberId) {

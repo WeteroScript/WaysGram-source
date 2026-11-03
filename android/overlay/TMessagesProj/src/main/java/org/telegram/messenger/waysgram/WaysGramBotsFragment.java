@@ -19,6 +19,8 @@ import org.telegram.messenger.AndroidUtilities;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 
 /** In-app BotFather for the internal WaysGram bot registry. */
@@ -27,6 +29,7 @@ public final class WaysGramBotsFragment extends BaseFragment {
     private EditText nameInput;
     private EditText usernameInput;
     private EditText aboutInput;
+    private EditText publicBotInput;
     private TextView statusView;
     private TextView tokenView;
     private LinearLayout botsContainer;
@@ -65,6 +68,13 @@ public final class WaysGramBotsFragment extends BaseFragment {
 
         statusView = label("Боты создаются внутри WaysGram и не становятся Telegram-ботами.", 13, false);
         root.addView(statusView, matchWrap());
+
+        TextView openHeading = label("Открыть существующего бота", 16, true);
+        root.addView(openHeading, matchWrap());
+        publicBotInput = addField(context, root, "Username бота, например @waysgram_helper_bot", 32);
+        Button openBotButton = button(context, "Открыть чат");
+        root.addView(openBotButton, matchWrap());
+        openBotButton.setOnClickListener(view -> openPublicBot());
 
         tokenView = label("", 12, false);
         tokenView.setTextIsSelectable(true);
@@ -206,6 +216,37 @@ public final class WaysGramBotsFragment extends BaseFragment {
         if (clipboard != null) {
             clipboard.setPrimaryClip(ClipData.newPlainText("WaysGram bot token", token));
             Toast.makeText(getParentActivity(), "Токен скопирован", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void openPublicBot() {
+        String username = textOf(publicBotInput).replaceFirst("^@", "").toLowerCase(Locale.US);
+        if (!username.matches("[a-z][a-z0-9_]{2,28}_bot")) {
+            statusView.setText("Введите корректный username бота в формате example_bot.");
+            return;
+        }
+        try {
+            String encoded = URLEncoder.encode(username, StandardCharsets.UTF_8.name());
+            statusView.setText("Ищу бота…");
+            apiClient.get("/api/bots/by-username/" + encoded, new WaysGramApiClient.Callback() {
+                @Override
+                public void onSuccess(JSONObject response) {
+                    long id = response.optLong("id", 0);
+                    String name = response.optString("name", username);
+                    if (id <= 0) {
+                        statusView.setText("Сервер вернул некорректную карточку бота.");
+                        return;
+                    }
+                    presentFragment(new WaysGramBotChatFragment(id, name), false);
+                }
+
+                @Override
+                public void onError(String message, int statusCode) {
+                    statusView.setText(message);
+                }
+            });
+        } catch (Exception exception) {
+            statusView.setText("Не удалось выполнить поиск бота.");
         }
     }
 

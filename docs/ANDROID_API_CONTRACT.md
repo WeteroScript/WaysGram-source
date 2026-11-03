@@ -1,8 +1,11 @@
 # WaysGram Android API contract: Telegram gift catalog
 
-Status: backend route and standalone Android API client overlay implemented; existing gift-screen wiring remains pending.
+Status: MTProto-first backend route and Android read-only gift UI are implemented in source. The overlay is reachable from WaysGram home and from a separate entry in the upstream gift sheet after login.
 
-Android overlay source: `android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramGiftCatalogClient.java`. The source-preparation script copies it into the pinned Telegram Android submodule. The client accepts an injected session provider; the application must supply the API root URL and WaysGram Bearer token from its secure session layer. The client callbacks run on its IO executor, so UI callers must dispatch view updates onto the main thread.
+Android gift client: `WaysGramGiftCatalogClient.java`.
+Encrypted WaysGram session: `WaysGramSessionStore.java`.
+Read-only catalog sheet: `WaysGramGiftCatalogSheet.java`.
+WaysGram auth screen stores the server-issued Bearer token in the session store after successful internal OTP verification. The client callbacks are delivered on the Android main thread by their handler.
 
 ## Catalog
 

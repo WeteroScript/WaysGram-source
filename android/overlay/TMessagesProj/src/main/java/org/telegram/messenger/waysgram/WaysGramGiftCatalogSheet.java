@@ -40,8 +40,8 @@ public final class WaysGramGiftCatalogSheet extends BottomSheet {
     private final Theme.ResourcesProvider resourcesProvider;
     private final GiftAdapter adapter;
 
-    private final TextView statusView;
-    private final ProgressBar progressBar;
+    private TextView statusView;
+    private ProgressBar progressBar;
 
     public WaysGramGiftCatalogSheet(
             Context context,
@@ -181,10 +181,6 @@ public final class WaysGramGiftCatalogSheet extends BottomSheet {
                 }
             });
         }
-    }
-
-    private boolean isDismissed() {
-        return !isShowing();
     }
 
     private final class GiftAdapter extends RecyclerView.Adapter<GiftHolder> {

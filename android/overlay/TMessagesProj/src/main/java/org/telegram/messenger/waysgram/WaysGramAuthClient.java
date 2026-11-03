@@ -54,6 +54,10 @@ public final class WaysGramAuthClient implements AutoCloseable {
         });
     }
 
+    public void checkServer(Callback callback) {
+        execute(callback, () -> getHealth());
+    }
+
     public void requestCode(String virtualNumber, Callback callback) {
         final String number;
         try {
@@ -139,6 +143,45 @@ public final class WaysGramAuthClient implements AutoCloseable {
                 deliverError(callback, safeMessage(exception));
             }
         });
+    }
+
+    private JSONObject getHealth() throws IOException {
+        HttpURLConnection connection = null;
+        try {
+            connection = (HttpURLConnection) new URL(apiBaseUrl + "/health").openConnection();
+            connection.setRequestMethod("GET");
+            connection.setInstanceFollowRedirects(false);
+            connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
+            connection.setReadTimeout(READ_TIMEOUT_MS);
+            connection.setRequestProperty("Accept", "application/json");
+
+            int status = connection.getResponseCode();
+            InputStream stream = status >= 200 && status < 300
+                    ? connection.getInputStream()
+                    : connection.getErrorStream();
+            byte[] bytes = stream == null ? new byte[0] : readLimited(stream, MAX_RESPONSE_BYTES);
+            JSONObject response;
+            try {
+                response = bytes.length == 0
+                        ? new JSONObject()
+                        : new JSONObject(new String(bytes, StandardCharsets.UTF_8));
+            } catch (Exception exception) {
+                throw new IOException("WaysGram вернул некорректный ответ проверки сервера", exception);
+            }
+            if (status < 200 || status >= 300) {
+                String detail = response.optString("detail", "");
+                throw new ApiException(status, detail);
+            }
+            if (!"online".equals(response.optString("status"))
+                    || !"waysgram-authbot".equals(response.optString("service"))) {
+                throw new IOException("Адрес не отвечает как сервер WaysGram AuthBot");
+            }
+            return response;
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
     }
 
     private JSONObject postJson(String path, JSONObject payload, String sessionToken) throws IOException {

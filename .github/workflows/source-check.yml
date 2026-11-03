@@ -30,6 +30,9 @@ jobs:
           expected="3de37c8cfb039452be7398909461da6288babf15"
           [[ "$entry" == *"commit $expected"* ]]
 
+      - name: Test GiftSheet source patcher
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
+
       - name: Verify WaysGram Android overlay
         run: |
           test -s android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramGiftCatalogClient.java

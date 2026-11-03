@@ -63,6 +63,9 @@ public final class WaysGramHomeFragment extends BaseFragment {
         addButton(context, content, "Каналы", () ->
                 presentFragment(new WaysGramDirectoryFragment(WaysGramDirectoryFragment.TYPE_CHANNELS), false)
         );
+        addButton(context, content, "BotFather · Мои боты", () ->
+                presentFragment(new WaysGramBotsFragment(), false)
+        );
         addButton(context, content, "Подарки Telegram", () ->
                 new WaysGramGiftCatalogSheet(context, sessionStore, resourceProvider).show()
         );

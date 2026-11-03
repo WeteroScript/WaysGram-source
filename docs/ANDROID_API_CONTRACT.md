@@ -52,6 +52,22 @@ The current Android overlay calls these API areas:
 
 The Android screens currently cover text-only messaging and the initial group/channel workflow. Media, push/WebSocket delivery, calls, complete moderation/member-management screens, and the in-app BotFather interface are not complete.
 
+## Group and channel management
+
+The group timeline loads `GET /api/groups/{group_id}`, including the signed-in user's role and the member list. Group management uses:
+
+- `POST /api/groups/{group_id}/members` with `telegram_id` or `username` to add a member (owner/admin).
+- `DELETE /api/groups/{group_id}/members/{telegram_id}` to remove a member or leave (subject to server role rules).
+- `POST /api/groups/{group_id}/admins` with `telegram_id` to promote a member (owner only).
+- `DELETE /api/groups/{group_id}/admins/{telegram_id}` to return an admin to member (owner only).
+
+The channel timeline loads `GET /api/channels/{channel_id}/admins`, which returns `owner_telegram_id`, `my_role`, and the channel administrator list. Only the channel owner can use:
+
+- `POST /api/channels/{channel_id}/admins` with `telegram_id` to appoint an administrator.
+- `DELETE /api/channels/{channel_id}/admins/{telegram_id}` to remove an administrator.
+
+The Android timeline now exposes these controls and lets the server enforce the final permission checks. The channel administrator list route is authenticated; it does not expose bot credentials or allow privilege changes by non-owners.
+
 ## Telegram gift catalogue
 
 The primary server source is bot-authenticated MTProto. When `TELEGRAM_API_ID` and `TELEGRAM_API_HASH` are configured, AuthBot starts a Telethon client using `BOT_TOKEN` and calls Telegram's `payments.getStarGifts`. The MTProto session belongs to the configured bot; WaysGram users do not provide Telegram credentials, personal login codes, or account sessions.

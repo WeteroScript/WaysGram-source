@@ -54,12 +54,12 @@ class LaunchActivity {
         return new IntroActivity();
     }
 
-        if (!UserConfig.getInstance(currentAccount).isClientActivated()) {
-            actionBarLayout.addFragmentToStack(getClientNotActivatedFragment());
-        } else {
-            MainTabsActivity mainTabsActivity = new MainTabsActivity();
-            actionBarLayout.addFragmentToStack(mainTabsActivity);
-        }
+            if (!UserConfig.getInstance(currentAccount).isClientActivated()) {
+                actionBarLayout.addFragmentToStack(getClientNotActivatedFragment());
+            } else {
+                MainTabsActivity mainTabsActivity = new MainTabsActivity();
+                actionBarLayout.addFragmentToStack(mainTabsActivity);
+            }
 }
 """
         updated = PATCHER.patch_launch_source(launch_source)
@@ -77,12 +77,13 @@ class LaunchActivity {
         }
         return new IntroActivity();
     }
-        if (!UserConfig.getInstance(currentAccount).isClientActivated()) {
-            actionBarLayout.addFragmentToStack(getClientNotActivatedFragment());
-        } else {
-            MainTabsActivity mainTabsActivity = new MainTabsActivity();
-            actionBarLayout.addFragmentToStack(mainTabsActivity);
-        }
+
+            if (!UserConfig.getInstance(currentAccount).isClientActivated()) {
+                actionBarLayout.addFragmentToStack(getClientNotActivatedFragment());
+            } else {
+                MainTabsActivity mainTabsActivity = new MainTabsActivity();
+                actionBarLayout.addFragmentToStack(mainTabsActivity);
+            }
 }
 """
         once = PATCHER.patch_launch_source(launch_source)

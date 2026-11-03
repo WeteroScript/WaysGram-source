@@ -57,7 +57,7 @@ def configure_android_root(android_root: Path) -> None:
     content = gradle_properties.read_text(encoding="utf-8")
     content = replace_one(
         r"^APP_PACKAGE=.*$",
-        "APP_PACKAGE=org.waysgram.messenger",
+        "APP_PACKAGE=org.telegram.messenger",
         content,
         "Android application ID",
     )

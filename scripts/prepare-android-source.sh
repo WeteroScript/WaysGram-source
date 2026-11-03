@@ -46,5 +46,8 @@ fi
 echo "Android source prepared."
 echo "Upstream: Telegram $EXPECTED_VERSION_NAME ($EXPECTED_VERSION_CODE)"
 echo "Pinned commit: $ACTUAL_COMMIT"
+python3 "$ROOT/scripts/apply-android-patches.py" --android-root "$ANDROID_ROOT"
+
 echo "WaysGram overlays copied into TMessagesProj/src/main/java."
+echo "Gift catalog entry patched into the original GiftSheet."
 echo "No APK was built."

@@ -81,6 +81,8 @@ The Android source is now available in the WaysGram repository through a pinned 
 
 The archive also contains Git submodule declarations. A complete checkout needs its submodules, Google/Firebase configuration and the app's own API/build credentials. Do not reuse the sample Telegram API credentials for a distributed fork.
 
+The pinned upstream includes Firebase Messaging and `GcmPushListenerService`, but that service forwards token registration through Telegram's `PushListenerController` and interprets Telegram-specific push payloads. It is not a WaysGram notification channel. WaysGram push requires its own Firebase project configuration for the fork's application ID and server-side Firebase credentials; the upstream `google-services.json` files must not be reused.
+
 ## 6. AuthBot repository findings
 
 The AuthBot repository already contains a FastAPI + Aiogram service and a shared SQLite database:

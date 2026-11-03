@@ -46,7 +46,9 @@ jobs:
             WaysGramChatFragment.java \
             WaysGramTimelineFragment.java \
             WaysGramGiftCatalogClient.java \
-            WaysGramGiftCatalogSheet.java; do
+            WaysGramGiftCatalogSheet.java \
+            WaysGramBotsFragment.java \
+            WaysGramBotDetailFragment.java; do
             test -s "android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/$source"
           done
           grep -q 'patch_launch_source' scripts/apply-android-patches.py
@@ -56,6 +58,9 @@ jobs:
           grep -q 'Для канала укажите username' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramDirectoryFragment.java
           grep -q 'InputFilter.LengthFilter(6)' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramLoginSheet.java
           grep -q 'Название должно содержать не более 80 символов' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramDirectoryFragment.java
+          grep -q 'new WaysGramBotsFragment()' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramHomeFragment.java
+          grep -q 'apiClient.put' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramBotDetailFragment.java
+          grep -q 'token_notice' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramBotsFragment.java
           grep -q 'Участники и права группы' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
           grep -q '"/api/groups/"' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
           grep -q '"/api/channels/"' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java

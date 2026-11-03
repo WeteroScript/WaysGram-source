@@ -20,6 +20,7 @@ jobs:
         run: |
           bash -n scripts/prepare-android-source.sh
           python -m py_compile scripts/apply-android-patches.py
+          python -m py_compile scripts/prepare_android_dev_build.py
 
       - name: Verify pinned Android submodule
         shell: bash
@@ -97,3 +98,5 @@ jobs:
           grep -q 'media_name' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
           grep -q 'ImageCallback' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
           grep -q 'prepare-android-source.sh' README.md
+          grep -q 'configure_android_root' scripts/prepare_android_dev_build.py
+          test -s tests/test_android_build_config.py

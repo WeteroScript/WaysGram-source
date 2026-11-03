@@ -24,6 +24,7 @@ import org.telegram.ui.ActionBar.Theme;
  */
 public final class WaysGramLoginSheet extends BottomSheet {
     private final WaysGramSessionStore sessionStore;
+    private final Runnable onLoginSuccess;
     private WaysGramAuthClient authClient;
 
     private final EditText apiBaseInput;
@@ -38,11 +39,21 @@ public final class WaysGramLoginSheet extends BottomSheet {
             WaysGramSessionStore sessionStore,
             Theme.ResourcesProvider resourcesProvider
     ) {
+        this(context, sessionStore, resourcesProvider, null);
+    }
+
+    public WaysGramLoginSheet(
+            Context context,
+            WaysGramSessionStore sessionStore,
+            Theme.ResourcesProvider resourcesProvider,
+            Runnable onLoginSuccess
+    ) {
         super(context, false, resourcesProvider);
         if (sessionStore == null) {
             throw new IllegalArgumentException("WaysGramSessionStore is required");
         }
         this.sessionStore = sessionStore;
+        this.onLoginSuccess = onLoginSuccess;
 
         setTitle("Вход в WaysGram", true);
         setApplyTopPadding(false);
@@ -223,6 +234,9 @@ public final class WaysGramLoginSheet extends BottomSheet {
                 statusView.setText("Вход выполнен" +
                         (displayName.length() > 0 ? ": " + displayName : "") + ".");
                 Toast.makeText(getContext(), "Сессия WaysGram сохранена", Toast.LENGTH_SHORT).show();
+                if (onLoginSuccess != null) {
+                    onLoginSuccess.run();
+                }
                 dismiss();
             }
 

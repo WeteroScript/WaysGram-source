@@ -179,6 +179,10 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
             statusView.setText("Введите название");
             return;
         }
+        if (title.length() > 80) {
+            statusView.setText("Название должно содержать не более 80 символов.");
+            return;
+        }
         if (type == TYPE_CHANNELS && username.length() == 0) {
             statusView.setText("Для канала укажите username.");
             return;

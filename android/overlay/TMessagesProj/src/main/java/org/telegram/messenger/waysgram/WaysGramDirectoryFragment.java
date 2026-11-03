@@ -5,6 +5,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
@@ -16,6 +17,9 @@ import org.telegram.messenger.AndroidUtilities;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+
 /** Server-backed WaysGram directory for DMs, groups and channels. */
 public final class WaysGramDirectoryFragment extends BaseFragment {
     public static final int TYPE_CONVERSATIONS = 1;
@@ -26,6 +30,8 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
     private WaysGramApiClient apiClient;
     private LinearLayout listContainer;
     private TextView statusView;
+    private EditText primaryInput;
+    private EditText usernameInput;
 
     public WaysGramDirectoryFragment(int type) {
         this.type = type;
@@ -57,6 +63,8 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
                 ViewGroup.LayoutParams.WRAP_CONTENT
         ));
 
+        addDirectoryControls(context, root);
+
         ScrollView scroll = new ScrollView(context);
         listContainer = new LinearLayout(context);
         listContainer.setOrientation(LinearLayout.VERTICAL);
@@ -81,6 +89,119 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
         fragmentView = root;
         loadItems();
         return root;
+    }
+
+    private void addDirectoryControls(Context context, LinearLayout root) {
+        if (type == TYPE_CONVERSATIONS) {
+            primaryInput = new EditText(context);
+            primaryInput.setSingleLine(true);
+            primaryInput.setHint("Поиск по username или имени");
+            root.addView(primaryInput, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+            ));
+            Button search = new Button(context);
+            search.setText("Найти пользователя");
+            root.addView(search, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+            ));
+            search.setOnClickListener(view -> searchUsers());
+            return;
+        }
+
+        primaryInput = new EditText(context);
+        primaryInput.setSingleLine(true);
+        primaryInput.setHint(type == TYPE_GROUPS ? "Название группы" : "Название канала");
+        root.addView(primaryInput, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+        usernameInput = new EditText(context);
+        usernameInput.setSingleLine(true);
+        usernameInput.setHint(type == TYPE_GROUPS
+                ? "Username группы (необязательно)"
+                : "Username канала");
+        root.addView(usernameInput, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+        Button create = new Button(context);
+        create.setText(type == TYPE_GROUPS ? "Создать группу" : "Создать канал");
+        root.addView(create, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+        create.setOnClickListener(view -> createDirectoryItem());
+    }
+
+    private void searchUsers() {
+        String query = primaryInput.getText() == null ? "" : primaryInput.getText().toString().trim();
+        if (query.length() == 0) {
+            statusView.setText("Введите username или имя для поиска");
+            return;
+        }
+        try {
+            String encoded = URLEncoder.encode(query, StandardCharsets.UTF_8.name());
+            statusView.setText("Ищу пользователей…");
+            apiClient.get("/api/users?q=" + encoded, new WaysGramApiClient.Callback() {
+                @Override
+                public void onSuccess(JSONObject response) {
+                    JSONArray users = response.optJSONArray("users");
+                    listContainer.removeAllViews();
+                    int count = users == null ? 0 : users.length();
+                    for (int i = 0; i < count; i++) {
+                        JSONObject item = users.optJSONObject(i);
+                        if (item != null) {
+                            addItem(item);
+                        }
+                    }
+                    statusView.setText(count == 0 ? "Пользователи не найдены" : "Найдено: " + count);
+                }
+
+                @Override
+                public void onError(String message, int statusCode) {
+                    statusView.setText(message);
+                }
+            });
+        } catch (Exception exception) {
+            statusView.setText("Не удалось выполнить поиск");
+        }
+    }
+
+    private void createDirectoryItem() {
+        String title = primaryInput.getText() == null ? "" : primaryInput.getText().toString().trim();
+        String username = usernameInput.getText() == null ? "" : usernameInput.getText().toString().trim();
+        if (title.length() == 0) {
+            statusView.setText("Введите название");
+            return;
+        }
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("title", title);
+            if (username.length() > 0) {
+                payload.put("username", username);
+            }
+        } catch (Exception exception) {
+            statusView.setText("Не удалось подготовить запрос");
+            return;
+        }
+        String path = type == TYPE_GROUPS ? "/api/groups" : "/api/channels";
+        statusView.setText(type == TYPE_GROUPS ? "Создаю группу…" : "Создаю канал…");
+        apiClient.post(path, payload, new WaysGramApiClient.Callback() {
+            @Override
+            public void onSuccess(JSONObject response) {
+                primaryInput.setText("");
+                usernameInput.setText("");
+                statusView.setText(type == TYPE_GROUPS ? "Группа создана" : "Канал создан");
+                loadItems();
+            }
+
+            @Override
+            public void onError(String message, int statusCode) {
+                statusView.setText(message);
+            }
+        });
     }
 
     private String titleForType() {

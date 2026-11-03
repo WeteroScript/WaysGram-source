@@ -14,7 +14,7 @@ cd WaysGram-source
 bash scripts/prepare-android-source.sh
 ```
 
-Скрипт проверяет закреплённую версию и копирует классы WaysGram REST overlay в Android-проект. Проверка исходников не изменяет оригинальные `LaunchActivity`, `LoginActivity`, `MainTabsActivity` или `GiftSheet`. Штатная навигация, экран входа и экран подарков Telegram остаются исходными. Launcher icon, upstream API settings, Google services и manifest declarations сохраняются; меняются только имя приложения и application id для отдельной установки WaysGram.
+Скрипт проверяет закреплённую версию и копирует классы WaysGram REST overlay в Android-проект. Проверка исходников не изменяет оригинальные `LaunchActivity`, `LoginActivity`, `MainTabsActivity` или `GiftSheet`. Штатная навигация, экран входа и экран подарков Telegram остаются исходными. Launcher icon, upstream API settings, Google services и manifest declarations сохраняются. Отображаемое имя меняется на WaysGram; debug APK использует зарегистрированный package `org.telegram.messenger.beta`, чтобы сохранить штатную конфигурацию Google Services.
 
 ## AuthBot и текущий REST backend
 
@@ -41,7 +41,7 @@ https://bot-1793554244-6434-weterochina.bothost.tech
 ## Сборка и проверки
 
 - `scripts/apply-android-patches.py` проверяет, что оригинальные точки входа и экран подарков не были изменены.
-- `scripts/prepare_android_dev_build.py` настраивает имя и package WaysGram, не меняя исходные Telegram API-настройки, сервисы, manifest или launcher icon.
+- `scripts/prepare_android_dev_build.py` задаёт имя WaysGram и сохраняет зарегистрированный Firebase-совместимый package `org.telegram.messenger` (для debug-варианта итоговый package — `org.telegram.messenger.beta`), не меняя исходные Telegram API-настройки, сервисы, manifest или launcher icon.
 - `.github/workflows/source-check.yml` проверяет скрипты и контракт исходников.
 - `.github/workflows/android-apk.yml` содержит отдельный workflow сборки debug APK. Сам факт наличия workflow не является подтверждением успешной сборки; ориентироваться нужно на результат конкретного запуска.
 

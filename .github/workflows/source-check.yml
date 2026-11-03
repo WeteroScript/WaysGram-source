@@ -52,4 +52,5 @@ jobs:
           grep -q 'patch_launch_source' scripts/apply-android-patches.py
           grep -q 'GET /api/telegram/gifts' docs/ANDROID_API_CONTRACT.md
           grep -q 'AuthWaysGram_bot' README.md
+          grep -q 'https://bot-1793554244-6434-weterochina.bothost.tech' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramLoginSheet.java
           grep -q 'prepare-android-source.sh' README.md

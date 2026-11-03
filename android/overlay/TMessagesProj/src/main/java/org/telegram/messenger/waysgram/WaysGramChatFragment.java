@@ -1,6 +1,10 @@
 package org.telegram.messenger.waysgram;
 
+import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
+import android.graphics.Bitmap;
+import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.Gravity;
@@ -9,6 +13,7 @@ import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -21,6 +26,7 @@ import org.telegram.ui.ActionBar.Theme;
 
 /** WaysGram direct text conversation backed by /api/messages. */
 public final class WaysGramChatFragment extends BaseFragment {
+    private static final int REQUEST_IMAGE = 7101;
     private final long peerId;
     private final String peerTitle;
 
@@ -87,7 +93,7 @@ public final class WaysGramChatFragment extends BaseFragment {
         composer.setOrientation(LinearLayout.HORIZONTAL);
         composer.setGravity(Gravity.CENTER_VERTICAL);
         messageInput = new EditText(context);
-        messageInput.setHint("Сообщение");
+        messageInput.setHint("Сообщение или подпись к фото");
         messageInput.setSingleLine(false);
         messageInput.setMaxLines(4);
         composer.addView(messageInput, new LinearLayout.LayoutParams(
@@ -95,8 +101,18 @@ public final class WaysGramChatFragment extends BaseFragment {
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 1
         ));
+        Button attachButton = new Button(context);
+        attachButton.setText("Фото");
+        attachButton.setAllCaps(false);
+        composer.addView(attachButton, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+        attachButton.setOnClickListener(view -> pickImage());
+
         Button sendButton = new Button(context);
         sendButton.setText("Отправить");
+        sendButton.setAllCaps(false);
         composer.addView(sendButton, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
@@ -201,6 +217,71 @@ public final class WaysGramChatFragment extends BaseFragment {
                 });
     }
 
+    private void pickImage() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("image/*");
+        startActivityForResult(intent, REQUEST_IMAGE);
+    }
+
+    @Override
+    public void onActivityResultFragment(int requestCode, int resultCode, Intent data) {
+        if (requestCode != REQUEST_IMAGE || resultCode != Activity.RESULT_OK || data == null) {
+            return;
+        }
+        Uri uri = data.getData();
+        if (uri == null) {
+            statusView.setText("Не удалось получить выбранное изображение.");
+            return;
+        }
+        statusView.setText("Загружаю изображение…");
+        apiClient.uploadImage(getParentActivity().getContentResolver(), uri,
+                new WaysGramApiClient.Callback() {
+                    @Override
+                    public void onSuccess(JSONObject response) {
+                        sendImage(response.optString("id", ""));
+                    }
+
+                    @Override
+                    public void onError(String message, int statusCode) {
+                        statusView.setText(message);
+                    }
+                });
+    }
+
+    private void sendImage(String mediaId) {
+        if (mediaId == null || !mediaId.matches("[a-f0-9]{32}")) {
+            statusView.setText("Сервер вернул некорректный ID изображения.");
+            return;
+        }
+        String caption = messageInput.getText() == null
+                ? ""
+                : messageInput.getText().toString().trim();
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("recipient_id", peerId);
+            payload.put("body", caption.length() == 0 ? "Изображение" : caption);
+            payload.put("media_id", mediaId);
+        } catch (Exception exception) {
+            statusView.setText("Не удалось подготовить изображение к отправке.");
+            return;
+        }
+        statusView.setText("Отправляю изображение…");
+        apiClient.post("/api/messages", payload, new WaysGramApiClient.Callback() {
+            @Override
+            public void onSuccess(JSONObject response) {
+                messageInput.setText("");
+                statusView.setText("Изображение отправлено.");
+                loadMessages();
+            }
+
+            @Override
+            public void onError(String message, int statusCode) {
+                statusView.setText(message);
+            }
+        });
+    }
+
     private void addMessage(JSONObject message) {
         TextView row = new TextView(getParentActivity());
         long sender = message.optLong("sender_id", 0);
@@ -216,6 +297,32 @@ public final class WaysGramChatFragment extends BaseFragment {
         );
         params.bottomMargin = AndroidUtilities.dp(4);
         messagesContainer.addView(row, params);
+
+        String mediaId = message.optString("media_id", "");
+        if (mediaId.matches("[a-f0-9]{32}")) {
+            ImageView image = new ImageView(getParentActivity());
+            image.setAdjustViewBounds(true);
+            image.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            image.setMaxHeight(AndroidUtilities.dp(260));
+            image.setMaxWidth(AndroidUtilities.dp(320));
+            LinearLayout.LayoutParams imageParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+            );
+            imageParams.bottomMargin = AndroidUtilities.dp(8);
+            messagesContainer.addView(image, imageParams);
+            apiClient.downloadImage(mediaId, new WaysGramApiClient.ImageCallback() {
+                @Override
+                public void onSuccess(Bitmap bitmap) {
+                    image.setImageBitmap(bitmap);
+                }
+
+                @Override
+                public void onError(String message, int statusCode) {
+                    image.setContentDescription("Изображение недоступно");
+                }
+            });
+        }
     }
 
     private void sendMessage() {

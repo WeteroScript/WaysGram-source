@@ -68,6 +68,21 @@ The channel timeline loads `GET /api/channels/{channel_id}/admins`, which return
 
 The Android timeline now exposes these controls and lets the server enforce the final permission checks. The channel administrator list route is authenticated; it does not expose bot credentials or allow privilege changes by non-owners.
 
+## Internal BotFather
+
+The home screen opens the WaysGram BotFather screens. The Android app uses the existing authenticated API:
+
+- `GET /api/bots` — list the current user's bots. Tokens are never included in list responses.
+- `POST /api/bots` — create a bot using `name`, `username`, and optional `about`/ `description`. The new token is returned once and shown in the creation screen.
+- `GET /api/bots/{bot_id}` — read owned bot metadata.
+- `GET /api/bots/{bot_id}/commands` and `PUT /api/bots/{bot_id}/commands` — read and replace up to 100 command descriptions.
+- `POST /api/bots/{bot_id}/token/reset` — revoke the prior token and display the replacement once.
+- `DELETE /api/bots/{bot_id}` — disable the bot and invalidate its token.
+
+The internal bot token is a bearer credential. Store it privately; do not paste it into public chats or commit it to source control. The backend stores only its hash. Internal bot updates and replies use `GET /api/bot-api/getUpdates` and `POST /api/bot-api/sendMessage`.
+
+These bots belong to WaysGram's internal registry. They are not Telegram Bot API bots and the server does not execute arbitrary user-supplied programs. A separate controlled runtime/webhook architecture would be required before hosted custom bot code could be supported.
+
 ## Message refresh
 
 Direct messages and group/channel timelines poll their authenticated history routes every four seconds using the incremental `after_id` cursor. This gives an open screen near-real-time text refresh without requiring a manual reload. It is HTTP polling, not WebSocket or push delivery; background notifications and delivery while the app is closed remain separate work.

@@ -61,12 +61,12 @@ The Android source repository pins Telegram 13.1.1 (build 7237) as a Git submodu
 - `WaysGramAuthClient` and `WaysGramLoginSheet`: virtual-number sign-in and one-time code verification through AuthBot.
 - `WaysGramLoginFragment` and `WaysGramHomeFragment`: login, profile and wallet screens.
 - `WaysGramApiClient`: authenticated JSON REST client.
-- `WaysGramDirectoryFragment`, `WaysGramChatFragment`, and `WaysGramTimelineFragment`: user search, initial group/channel creation, and text-based messaging views.
+- `WaysGramDirectoryFragment`, `WaysGramChatFragment`, and `WaysGramTimelineFragment`: user search, initial group/channel creation, text messaging, image attachments and PDF/TXT/CSV document attachments with save-to-device support.
 - `WaysGramGiftCatalogClient` and `WaysGramGiftCatalogSheet`: read-only MTProto catalogue and sticker proxy UI.
 
 The login screen now defaults to `https://bot-1793554244-6434-weterochina.bothost.tech`; the field remains editable. This only configures the client's API origin. The hosting domain must still run the AuthBot FastAPI service and proxy the API paths; deployment health has not been confirmed from the source repository.
 
-The group/channel timeline exposes member and administrator controls. Direct messages and group/channel timelines support static JPEG, PNG and WebP attachments, with server-side decoding/normalization and participant-scoped downloads. Open conversations use bounded HTTP long polling (up to 20 seconds per request) and stop waiting while paused/in the background; this is not WebSocket or push delivery. The home screen includes the internal BotFather UI and user-to-bot chat. The server does not execute arbitrary user programs. Video, animated images, documents, background notifications, contacts, calls, hosted bot runtime, and remaining client screens are incomplete. The Android client has not been built into an APK.
+The group/channel timeline exposes member and administrator controls. Direct messages and group/channel timelines support static JPEG, PNG and WebP attachments, with server-side decoding/normalization and participant-scoped downloads. PDF, TXT and CSV documents can be attached to direct messages, groups and channels; the Android system picker selects outgoing files and saves incoming documents. Message responses include media type and filename metadata. Open conversations use bounded HTTP long polling (up to 20 seconds per request) and stop waiting while paused/in the background; this is not WebSocket or push delivery. The home screen includes the internal BotFather UI and user-to-bot chat. The server does not execute arbitrary user programs. Video, animated images, background notifications, contacts, calls, hosted bot runtime, and remaining client screens are incomplete. The Android client has not been built into an APK.
 
 ## 5. Build environment
 
@@ -90,7 +90,7 @@ The AuthBot repository already contains a FastAPI + Aiogram service and a shared
 - API coverage includes profiles, personal messages, text channels, internal Stars/Gram balances and gifts;
 - admin access is restricted by `ADMIN_ID`.
 
-The AuthBot backend now includes text group chats with owner/admin/member roles, an internal BotFather registry, per-bot command lists, and a token-authenticated text message/update API. It does not execute arbitrary user-supplied code. Media upload, push/WebSocket delivery, calls, bot webhooks and a hardened isolated bot runtime are still not implemented.
+The AuthBot backend now includes text group chats with owner/admin/member roles, an internal BotFather registry, per-bot command lists, a token-authenticated text message/update API, and authenticated media storage for static JPEG/PNG/WebP images plus PDF/TXT/CSV documents. Document downloads use attachment disposition and access checks. It does not execute arbitrary user-supplied code. Push/WebSocket delivery, calls, bot webhooks and a hardened isolated bot runtime are still not implemented.
 
 ## 7. Changes already committed to WaysGram-AuthBot
 
@@ -108,7 +108,7 @@ GitHub Actions test runs for the latest AuthBot changes are linked from the repo
 1. Verify the hosting domain runs the AuthBot FastAPI service and correctly proxies `/api/*`, `/health`, and protected `/internal/*` paths.
 2. Run end-to-end checks for virtual-number sign-in, session persistence, profile/wallet, user lookup, direct messages, group creation, channel creation, text histories and Telegram gift/sticker retrieval.
 3. Add reliable real-time delivery (WebSocket or push) and reconnect/history synchronization.
-4. Implement media upload and delivery, contacts, calls, full group/channel member and moderation screens, and the internal BotFather UI.
+4. Complete remaining group/channel moderation and directory screens; implement contacts, calls and full push/background notification delivery. Static image and PDF/TXT/CSV media transfer is already implemented in the backend and current Android overlays.
 5. Review and complete authorization, rate limits, observability, database backup and production deployment hardening.
 6. Set the independent app package ID, signing configuration, app icon and app/service credentials.
 7. Add Android build CI and perform APK build/install tests only after the source/API integration milestones are complete.

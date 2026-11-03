@@ -1,5 +1,9 @@
 package org.telegram.messenger.waysgram;
 
+import android.content.ContentResolver;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
 
@@ -23,9 +27,15 @@ public final class WaysGramApiClient implements AutoCloseable {
     private static final int CONNECT_TIMEOUT_MS = 15000;
     private static final int READ_TIMEOUT_MS = 20000;
     private static final int MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
+    private static final int MAX_MEDIA_BYTES = 10 * 1024 * 1024;
 
     public interface Callback {
         void onSuccess(JSONObject response);
+        void onError(String message, int statusCode);
+    }
+
+    public interface ImageCallback {
+        void onSuccess(Bitmap bitmap);
         void onError(String message, int statusCode);
     }
 
@@ -61,6 +71,36 @@ public final class WaysGramApiClient implements AutoCloseable {
         execute("DELETE", path, null, callback);
     }
 
+    public void uploadImage(ContentResolver resolver, Uri uri, Callback callback) {
+        ioExecutor.execute(() -> {
+            try {
+                JSONObject response = performImageUpload(resolver, uri);
+                deliverSuccess(callback, response);
+            } catch (ApiException exception) {
+                deliverError(callback, exception.getMessage(), exception.statusCode);
+            } catch (Exception exception) {
+                deliverError(callback, "Не удалось загрузить изображение", 0);
+            }
+        });
+    }
+
+    public void downloadImage(String mediaId, ImageCallback callback) {
+        ioExecutor.execute(() -> {
+            try {
+                Bitmap bitmap = performImageDownload(mediaId);
+                mainHandler.post(() -> {
+                    if (callback != null) {
+                        callback.onSuccess(bitmap);
+                    }
+                });
+            } catch (ApiException exception) {
+                deliverImageError(callback, exception.getMessage(), exception.statusCode);
+            } catch (Exception exception) {
+                deliverImageError(callback, "Не удалось загрузить изображение", 0);
+            }
+        });
+    }
+
     private void execute(String method, String path, JSONObject payload, Callback callback) {
         ioExecutor.execute(() -> {
             try {
@@ -72,6 +112,162 @@ public final class WaysGramApiClient implements AutoCloseable {
                 deliverError(callback, "Не удалось связаться с сервером WaysGram", 0);
             }
         });
+    }
+
+    private JSONObject performImageUpload(ContentResolver resolver, Uri uri) throws IOException {
+        if (resolver == null || uri == null) {
+            throw new IOException("Не выбран файл изображения");
+        }
+        byte[] content;
+        try (InputStream input = resolver.openInputStream(uri)) {
+            if (input == null) {
+                throw new IOException("Не удалось открыть выбранное изображение");
+            }
+            content = readLimited(input, MAX_MEDIA_BYTES);
+        }
+        if (content.length == 0) {
+            throw new IOException("Файл изображения пуст");
+        }
+        String mimeType = detectImageMime(content);
+        String baseUrl = sessionStore.getApiBaseUrl();
+        String token = sessionStore.getWaysGramSessionToken();
+        if (baseUrl == null || token == null || token.length() == 0) {
+            throw new IOException("Нет активной сессии WaysGram");
+        }
+
+        HttpURLConnection connection = null;
+        try {
+            connection = (HttpURLConnection) new URL(baseUrl + "/api/media/images").openConnection();
+            connection.setRequestMethod("POST");
+            connection.setInstanceFollowRedirects(false);
+            connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
+            connection.setReadTimeout(READ_TIMEOUT_MS);
+            connection.setDoOutput(true);
+            connection.setRequestProperty("Accept", "application/json");
+            connection.setRequestProperty("Authorization", "Bearer " + token);
+            connection.setRequestProperty("Content-Type", mimeType);
+            connection.setFixedLengthStreamingMode(content.length);
+            try (OutputStream output = connection.getOutputStream()) {
+                output.write(content);
+            }
+            int status = connection.getResponseCode();
+            InputStream stream = status >= 200 && status < 300
+                    ? connection.getInputStream()
+                    : connection.getErrorStream();
+            byte[] responseBytes = stream == null ? new byte[0] : readLimited(stream, MAX_RESPONSE_BYTES);
+            JSONObject response = parseJsonResponse(responseBytes);
+            if (status < 200 || status >= 300) {
+                throw new ApiException(status, safeApiMessage(response, status));
+            }
+            return response;
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
+    }
+
+    private Bitmap performImageDownload(String mediaId) throws IOException {
+        if (mediaId == null || !mediaId.matches("[a-f0-9]{32}")) {
+            throw new IOException("Некорректный идентификатор изображения");
+        }
+        String baseUrl = sessionStore.getApiBaseUrl();
+        String token = sessionStore.getWaysGramSessionToken();
+        if (baseUrl == null || token == null || token.length() == 0) {
+            throw new IOException("Нет активной сессии WaysGram");
+        }
+
+        HttpURLConnection connection = null;
+        try {
+            connection = (HttpURLConnection) new URL(baseUrl + "/api/media/" + mediaId).openConnection();
+            connection.setRequestMethod("GET");
+            connection.setInstanceFollowRedirects(false);
+            connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
+            connection.setReadTimeout(READ_TIMEOUT_MS);
+            connection.setRequestProperty("Accept", "image/jpeg,image/png,image/webp");
+            connection.setRequestProperty("Authorization", "Bearer " + token);
+            int status = connection.getResponseCode();
+            if (status < 200 || status >= 300) {
+                InputStream error = connection.getErrorStream();
+                byte[] errorBytes = error == null ? new byte[0] : readLimited(error, MAX_RESPONSE_BYTES);
+                JSONObject errorJson = parseJsonResponse(errorBytes);
+                throw new ApiException(status, safeApiMessage(errorJson, status));
+            }
+            byte[] bytes = readLimited(connection.getInputStream(), MAX_MEDIA_BYTES);
+            BitmapFactory.Options bounds = new BitmapFactory.Options();
+            bounds.inJustDecodeBounds = true;
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.length, bounds);
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+                throw new IOException("Сервер вернул некорректное изображение");
+            }
+            bounds.inSampleSize = 1;
+            while (bounds.outWidth / bounds.inSampleSize > 1600
+                    || bounds.outHeight / bounds.inSampleSize > 1600) {
+                bounds.inSampleSize *= 2;
+            }
+            bounds.inJustDecodeBounds = false;
+            Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length, bounds);
+            if (bitmap == null) {
+                throw new IOException("Не удалось декодировать изображение");
+            }
+            return bitmap;
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
+    }
+
+    private static String detectImageMime(byte[] content) throws IOException {
+        if (content.length >= 3
+                && (content[0] & 0xff) == 0xff
+                && (content[1] & 0xff) == 0xd8
+                && (content[2] & 0xff) == 0xff) {
+            return "image/jpeg";
+        }
+        if (content.length >= 8
+                && content[0] == (byte) 0x89
+                && content[1] == 0x50
+                && content[2] == 0x4e
+                && content[3] == 0x47
+                && content[4] == 0x0d
+                && content[5] == 0x0a
+                && content[6] == 0x1a
+                && content[7] == 0x0a) {
+            return "image/png";
+        }
+        if (content.length >= 12
+                && content[0] == 'R' && content[1] == 'I'
+                && content[2] == 'F' && content[3] == 'F'
+                && content[8] == 'W' && content[9] == 'E'
+                && content[10] == 'B' && content[11] == 'P') {
+            return "image/webp";
+        }
+        throw new IOException("Поддерживаются только JPEG, PNG и WebP");
+    }
+
+    private static JSONObject parseJsonResponse(byte[] bytes) throws IOException {
+        try {
+            return bytes.length == 0
+                    ? new JSONObject()
+                    : new JSONObject(new String(bytes, StandardCharsets.UTF_8));
+        } catch (Exception exception) {
+            throw new IOException("WaysGram вернул некорректный JSON", exception);
+        }
+    }
+
+    private static String safeApiMessage(JSONObject response, int status) {
+        String message = response.optString("detail", "");
+        if (message.length() == 0 || message.length() > 240) {
+            return "Ошибка WaysGram API: HTTP " + status;
+        }
+        return message;
+    }
+
+    private void deliverImageError(ImageCallback callback, String message, int statusCode) {
+        if (callback != null) {
+            mainHandler.post(() -> callback.onError(message, statusCode));
+        }
     }
 
     private JSONObject request(String method, String path, JSONObject payload) throws IOException {
@@ -129,6 +325,22 @@ public final class WaysGramApiClient implements AutoCloseable {
             if (connection != null) {
                 connection.disconnect();
             }
+        }
+    }
+
+    private static byte[] readLimited(InputStream input, int maximum) throws IOException {
+        try (InputStream stream = input; ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[8192];
+            int count;
+            int total = 0;
+            while ((count = stream.read(buffer)) != -1) {
+                total += count;
+                if (total > maximum) {
+                    throw new IOException("WaysGram media file exceeds the allowed size");
+                }
+                output.write(buffer, 0, count);
+            }
+            return output.toByteArray();
         }
     }
 

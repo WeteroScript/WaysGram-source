@@ -24,7 +24,9 @@ VIEW_BLOCK = """        starsHeaderView.addView(titleStarsView, LayoutHelper.cre
         waysGramCatalogButton.setOnClickListener(view -> {
             WaysGramSessionStore sessionStore = WaysGramSessionStore.getInstance(context);
             if (!sessionStore.hasSession()) {
-                new WaysGramLoginSheet(context, sessionStore, resourcesProvider).show();
+                new WaysGramLoginSheet(context, sessionStore, resourcesProvider, () ->
+                        new WaysGramGiftCatalogSheet(context, sessionStore, resourcesProvider).show()
+                ).show();
                 return;
             }
             new WaysGramGiftCatalogSheet(context, sessionStore, resourcesProvider).show();

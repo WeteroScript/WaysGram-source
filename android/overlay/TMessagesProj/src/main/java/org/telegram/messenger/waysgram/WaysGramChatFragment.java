@@ -171,9 +171,13 @@ public final class WaysGramChatFragment extends BaseFragment {
     }
 
     private void scheduleNextPoll() {
+        scheduleNextPoll(500);
+    }
+
+    private void scheduleNextPoll(int delayMs) {
         if (apiClient != null && isScreenResumed) {
             pollHandler.removeCallbacks(pollRunnable);
-            pollHandler.postDelayed(pollRunnable, 4000);
+            pollHandler.postDelayed(pollRunnable, delayMs);
         }
     }
 
@@ -182,7 +186,7 @@ public final class WaysGramChatFragment extends BaseFragment {
             return;
         }
         pollInFlight = true;
-        apiClient.get("/api/messages?with=" + peerId + "&after_id=" + lastMessageId,
+        apiClient.get("/api/messages?with=" + peerId + "&after_id=" + lastMessageId + "&wait_seconds=20",
                 new WaysGramApiClient.Callback() {
                     @Override
                     public void onSuccess(JSONObject response) {
@@ -212,7 +216,7 @@ public final class WaysGramChatFragment extends BaseFragment {
                             WaysGramSessionStore.getInstance(getParentActivity()).clearSession();
                             presentFragment(new WaysGramLoginFragment(), true);
                         } else {
-                            scheduleNextPoll();
+                            scheduleNextPoll(4000);
                         }
                     }
                 });

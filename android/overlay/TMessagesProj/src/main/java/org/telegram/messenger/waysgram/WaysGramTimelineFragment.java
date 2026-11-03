@@ -26,7 +26,8 @@ import org.telegram.ui.ActionBar.Theme;
 
 /** WaysGram group/channel text timeline backed by the private REST API. */
 public final class WaysGramTimelineFragment extends BaseFragment {
-    private static final int REQUEST_IMAGE = 7102;
+    private static final int REQUEST_ATTACHMENT = 7102;
+    private static final int REQUEST_SAVE_DOCUMENT = 7104;
     public static final int TYPE_GROUP = 1;
     public static final int TYPE_CHANNEL = 2;
 
@@ -53,6 +54,7 @@ public final class WaysGramTimelineFragment extends BaseFragment {
     private long lastMessageId = 0;
     private boolean pollInFlight = false;
     private boolean isScreenResumed = false;
+    private String pendingSaveMediaId;
     private Button managementActionButton;
 
     public WaysGramTimelineFragment(int type, long targetId, String targetTitle) {
@@ -114,15 +116,15 @@ public final class WaysGramTimelineFragment extends BaseFragment {
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 1
         ));
-        messageInput.setHint(type == TYPE_GROUP ? "Сообщение в группу" : "Публикация или подпись к фото");
+        messageInput.setHint(type == TYPE_GROUP ? "Сообщение в группу" : "Публикация или подпись к вложению");
         attachButton = new Button(context);
-        attachButton.setText("Фото");
+        attachButton.setText("Файл");
         attachButton.setAllCaps(false);
         composer.addView(attachButton, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
         ));
-        attachButton.setOnClickListener(view -> pickImage());
+        attachButton.setOnClickListener(view -> pickAttachment());
 
         sendButton = new Button(context);
         sendButton.setText(type == TYPE_GROUP ? "Отправить" : "Опубликовать");
@@ -233,45 +235,83 @@ public final class WaysGramTimelineFragment extends BaseFragment {
                 : "/api/channels/" + targetId + "/messages";
     }
 
-    private void pickImage() {
+    private void pickAttachment() {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("image/*");
-        startActivityForResult(intent, REQUEST_IMAGE);
+        intent.setType("*/*");
+        intent.putExtra(Intent.EXTRA_MIME_TYPES,
+                new String[]{"image/*", "application/pdf", "text/plain", "text/csv"});
+        startActivityForResult(intent, REQUEST_ATTACHMENT);
     }
 
     @Override
     public void onActivityResultFragment(int requestCode, int resultCode, Intent data) {
-        if (requestCode != REQUEST_IMAGE || resultCode != Activity.RESULT_OK || data == null) {
+        if (requestCode == REQUEST_SAVE_DOCUMENT) {
+            if (resultCode != Activity.RESULT_OK || data == null || data.getData() == null) {
+                pendingSaveMediaId = null;
+                return;
+            }
+            String mediaId = pendingSaveMediaId;
+            pendingSaveMediaId = null;
+            if (mediaId == null) {
+                statusView.setText("Не выбран документ для сохранения.");
+                return;
+            }
+            statusView.setText("Сохраняю документ…");
+            apiClient.downloadDocumentToUri(getParentActivity().getContentResolver(), data.getData(),
+                    mediaId, new WaysGramApiClient.Callback() {
+                        @Override
+                        public void onSuccess(JSONObject response) {
+                            statusView.setText("Документ сохранён.");
+                        }
+
+                        @Override
+                        public void onError(String message, int statusCode) {
+                            statusView.setText(message);
+                        }
+                    });
+            return;
+        }
+        if (requestCode != REQUEST_ATTACHMENT || resultCode != Activity.RESULT_OK || data == null) {
             return;
         }
         Uri uri = data.getData();
         if (uri == null) {
-            statusView.setText("Не удалось получить выбранное изображение.");
+            statusView.setText("Не удалось получить выбранный файл.");
             return;
         }
-        statusView.setText("Загружаю изображение…");
+        String mimeType = getParentActivity().getContentResolver().getType(uri);
+        statusView.setText("Загружаю вложение…");
         if (attachButton != null) {
             attachButton.setEnabled(false);
         }
-        apiClient.uploadImage(getParentActivity().getContentResolver(), uri,
-                new WaysGramApiClient.Callback() {
-                    @Override
-                    public void onSuccess(JSONObject response) {
-                        if (attachButton != null) {
-                            attachButton.setEnabled(true);
-                        }
-                        sendImage(response.optString("id", ""));
-                    }
+        WaysGramApiClient.Callback uploadCallback = new WaysGramApiClient.Callback() {
+            @Override
+            public void onSuccess(JSONObject response) {
+                if (attachButton != null) {
+                    attachButton.setEnabled(true);
+                }
+                String mediaId = response.optString("id", "");
+                if (mimeType != null && mimeType.startsWith("image/")) {
+                    sendImage(mediaId);
+                } else {
+                    sendDocument(mediaId);
+                }
+            }
 
-                    @Override
-                    public void onError(String message, int statusCode) {
-                        if (attachButton != null) {
-                            attachButton.setEnabled(true);
-                        }
-                        statusView.setText(message);
-                    }
-                });
+            @Override
+            public void onError(String message, int statusCode) {
+                if (attachButton != null) {
+                    attachButton.setEnabled(true);
+                }
+                statusView.setText(message);
+            }
+        };
+        if (mimeType != null && mimeType.startsWith("image/")) {
+            apiClient.uploadImage(getParentActivity().getContentResolver(), uri, uploadCallback);
+        } else {
+            apiClient.uploadDocument(getParentActivity().getContentResolver(), uri, uploadCallback);
+        }
     }
 
     private void sendImage(String mediaId) {
@@ -740,7 +780,8 @@ public final class WaysGramTimelineFragment extends BaseFragment {
         messagesContainer.addView(row, params);
 
         String mediaId = message.optString("media_id", "");
-        if (mediaId.matches("[a-f0-9]{32}")) {
+        String mediaType = message.optString("media_type", "");
+        if (mediaId.matches("[a-f0-9]{32}") && mediaType.startsWith("image/")) {
             ImageView image = new ImageView(getParentActivity());
             image.setAdjustViewBounds(true);
             image.setScaleType(ImageView.ScaleType.FIT_CENTER);
@@ -763,7 +804,65 @@ public final class WaysGramTimelineFragment extends BaseFragment {
                     image.setContentDescription("Изображение недоступно");
                 }
             });
+        } else if (mediaId.matches("[a-f0-9]{32}") && !mediaType.isEmpty()) {
+            String mediaName = message.optString("media_name", "document");
+            Button fileButton = new Button(getParentActivity());
+            fileButton.setAllCaps(false);
+            fileButton.setText("Сохранить документ: " + mediaName);
+            messagesContainer.addView(fileButton, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            fileButton.setOnClickListener(view -> saveDocument(mediaId, mediaName, mediaType));
         }
+    }
+
+    private void saveDocument(String mediaId, String mediaName, String mediaType) {
+        if (mediaId == null || !mediaId.matches("[a-f0-9]{32}")) {
+            statusView.setText("Некорректный ID документа.");
+            return;
+        }
+        pendingSaveMediaId = mediaId;
+        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType(mediaType == null || mediaType.length() == 0 ? "application/octet-stream" : mediaType);
+        intent.putExtra(Intent.EXTRA_TITLE, mediaName == null || mediaName.length() == 0 ? "document" : mediaName);
+        startActivityForResult(intent, REQUEST_SAVE_DOCUMENT);
+    }
+
+    private void sendDocument(String mediaId) {
+        if (mediaId == null || !mediaId.matches("[a-f0-9]{32}")) {
+            statusView.setText("Сервер вернул некорректный ID документа.");
+            return;
+        }
+        String caption = messageInput.getText() == null ? "" : messageInput.getText().toString().trim();
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("body", caption);
+            payload.put("media_id", mediaId);
+        } catch (Exception exception) {
+            statusView.setText("Не удалось подготовить документ к отправке.");
+            return;
+        }
+        sendButton.setEnabled(false);
+        statusView.setText(type == TYPE_GROUP ? "Отправляю документ в группу…" : "Публикую документ…");
+        apiClient.post(basePath(), payload, new WaysGramApiClient.Callback() {
+            @Override
+            public void onSuccess(JSONObject response) {
+                messageInput.setText("");
+                sendButton.setEnabled(true);
+                statusView.setText(type == TYPE_GROUP ? "Документ отправлен." : "Документ опубликован.");
+                loadMessages();
+            }
+
+            @Override
+            public void onError(String message, int statusCode) {
+                sendButton.setEnabled(true);
+                statusView.setText(message);
+                if (statusCode == 401) {
+                    WaysGramSessionStore.getInstance(getParentActivity()).clearSession();
+                    presentFragment(new WaysGramLoginFragment(), true);
+                }
+            }
+        });
     }
 
     private void sendMessage() {

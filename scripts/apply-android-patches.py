@@ -8,7 +8,7 @@ IMPORT_ANCHOR = "import org.telegram.messenger.UserObject;"
 IMPORTS = """import org.telegram.messenger.UserObject;
 import org.telegram.messenger.waysgram.WaysGramGiftCatalogSheet;
 import org.telegram.messenger.waysgram.WaysGramSessionStore;
-import android.widget.Toast;"""
+import org.telegram.messenger.waysgram.WaysGramLoginSheet;"""
 
 VIEW_ANCHOR = """        starsHeaderView.addView(titleStarsView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 4, 0, 4, 0));"""
 
@@ -24,7 +24,7 @@ VIEW_BLOCK = """        starsHeaderView.addView(titleStarsView, LayoutHelper.cre
         waysGramCatalogButton.setOnClickListener(view -> {
             WaysGramSessionStore sessionStore = WaysGramSessionStore.getInstance(context);
             if (!sessionStore.hasSession()) {
-                Toast.makeText(context, "Сначала войдите в WaysGram", Toast.LENGTH_SHORT).show();
+                new WaysGramLoginSheet(context, sessionStore, resourcesProvider).show();
                 return;
             }
             new WaysGramGiftCatalogSheet(context, sessionStore, resourcesProvider).show();

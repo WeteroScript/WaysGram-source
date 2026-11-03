@@ -163,9 +163,13 @@ public final class WaysGramBotChatFragment extends BaseFragment {
     }
 
     private void scheduleNextPoll() {
+        scheduleNextPoll(500);
+    }
+
+    private void scheduleNextPoll(int delayMs) {
         if (apiClient != null && isScreenResumed) {
             pollHandler.removeCallbacks(pollRunnable);
-            pollHandler.postDelayed(pollRunnable, 4000);
+            pollHandler.postDelayed(pollRunnable, delayMs);
         }
     }
 
@@ -174,7 +178,7 @@ public final class WaysGramBotChatFragment extends BaseFragment {
             return;
         }
         pollInFlight = true;
-        apiClient.get(messagesPath() + "?after_id=" + lastMessageId, new WaysGramApiClient.Callback() {
+        apiClient.get(messagesPath() + "?after_id=" + lastMessageId + "&wait_seconds=20", new WaysGramApiClient.Callback() {
             @Override
             public void onSuccess(JSONObject response) {
                 pollInFlight = false;
@@ -200,11 +204,11 @@ public final class WaysGramBotChatFragment extends BaseFragment {
             public void onError(String message, int statusCode) {
                 pollInFlight = false;
                 if (statusCode == 404) {
-                    scheduleNextPoll();
+                    scheduleNextPoll(4000);
                 } else {
                     handleAuthError(statusCode);
                     if (statusCode != 401) {
-                        scheduleNextPoll();
+                        scheduleNextPoll(4000);
                     }
                 }
             }

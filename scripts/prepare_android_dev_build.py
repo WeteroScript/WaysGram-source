@@ -18,6 +18,19 @@ def replace_one(pattern: str, replacement: str, content: str, label: str) -> str
     return updated
 
 
+def replace_string_value(content: str, name: str, value: str) -> tuple[str, bool]:
+    pattern = re.compile(
+        '(<string[ ]+name="' + re.escape(name) + '">).*?(</string>)',
+        flags=re.DOTALL,
+    )
+    updated, count = pattern.subn(
+        lambda match: match.group(1) + value + match.group(2),
+        content,
+        count=1,
+    )
+    return updated, count == 1
+
+
 def patch_string_resources(android_root: Path) -> None:
     values_dirs = android_root / "TMessagesProj/src/main/res"
     files = list(values_dirs.glob("values*/strings.xml"))
@@ -27,24 +40,10 @@ def patch_string_resources(android_root: Path) -> None:
     found_beta_name = False
     for path in files:
         content = path.read_text(encoding="utf-8")
-        if '<string name="AppName">' in content:
-            content, count = re.subn(
-                r'(<string\\s+name="AppName">).*?(</string>)',
-                r'\\1WaysGram\\2',
-                content,
-                count=1,
-                flags=re.DOTALL,
-            )
-            found_app_name = found_app_name or count == 1
-        if '<string name="AppNameBeta">' in content:
-            content, count = re.subn(
-                r'(<string\\s+name="AppNameBeta">).*?(</string>)',
-                r'\\1WaysGram Dev\\2',
-                content,
-                count=1,
-                flags=re.DOTALL,
-            )
-            found_beta_name = found_beta_name or count == 1
+        content, found = replace_string_value(content, "AppName", "WaysGram")
+        found_app_name = found_app_name or found
+        content, found = replace_string_value(content, "AppNameBeta", "WaysGram Dev")
+        found_beta_name = found_beta_name or found
         path.write_text(content, encoding="utf-8")
     if not found_app_name or not found_beta_name:
         raise ValueError("AppName/AppNameBeta resources were not found")

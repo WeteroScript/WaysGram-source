@@ -70,4 +70,9 @@ jobs:
           grep -q '"/api/channels/"' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
           grep -q 'pollNewMessages' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
           grep -q 'pollNewMessages' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramChatFragment.java
+          grep -q 'uploadImage' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramApiClient.java
+          grep -q 'downloadImage' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramApiClient.java
+          grep -q 'REQUEST_IMAGE' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramChatFragment.java
+          grep -q 'REQUEST_IMAGE' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
+          grep -q 'ImageCallback' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
           grep -q 'prepare-android-source.sh' README.md

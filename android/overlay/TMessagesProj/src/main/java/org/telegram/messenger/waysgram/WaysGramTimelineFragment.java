@@ -1,6 +1,10 @@
 package org.telegram.messenger.waysgram;
 
+import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
+import android.graphics.Bitmap;
+import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.InputType;
@@ -9,6 +13,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -21,6 +26,7 @@ import org.telegram.ui.ActionBar.Theme;
 
 /** WaysGram group/channel text timeline backed by the private REST API. */
 public final class WaysGramTimelineFragment extends BaseFragment {
+    private static final int REQUEST_IMAGE = 7102;
     public static final int TYPE_GROUP = 1;
     public static final int TYPE_CHANNEL = 2;
 
@@ -36,6 +42,7 @@ public final class WaysGramTimelineFragment extends BaseFragment {
     private TextView statusView;
     private TextView managementStatusView;
     private Button sendButton;
+    private Button attachButton;
     private final Handler pollHandler = new Handler(Looper.getMainLooper());
     private final Runnable pollRunnable = new Runnable() {
         @Override
@@ -106,6 +113,16 @@ public final class WaysGramTimelineFragment extends BaseFragment {
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 1
         ));
+        messageInput.setHint(type == TYPE_GROUP ? "Сообщение в группу" : "Публикация или подпись к фото");
+        attachButton = new Button(context);
+        attachButton.setText("Фото");
+        attachButton.setAllCaps(false);
+        composer.addView(attachButton, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+        attachButton.setOnClickListener(view -> pickImage());
+
         sendButton = new Button(context);
         sendButton.setText(type == TYPE_GROUP ? "Отправить" : "Опубликовать");
         sendButton.setAllCaps(false);
@@ -213,6 +230,86 @@ public final class WaysGramTimelineFragment extends BaseFragment {
         return type == TYPE_GROUP
                 ? "/api/groups/" + targetId + "/messages"
                 : "/api/channels/" + targetId + "/messages";
+    }
+
+    private void pickImage() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("image/*");
+        startActivityForResult(intent, REQUEST_IMAGE);
+    }
+
+    @Override
+    public void onActivityResultFragment(int requestCode, int resultCode, Intent data) {
+        if (requestCode != REQUEST_IMAGE || resultCode != Activity.RESULT_OK || data == null) {
+            return;
+        }
+        Uri uri = data.getData();
+        if (uri == null) {
+            statusView.setText("Не удалось получить выбранное изображение.");
+            return;
+        }
+        statusView.setText("Загружаю изображение…");
+        if (attachButton != null) {
+            attachButton.setEnabled(false);
+        }
+        apiClient.uploadImage(getParentActivity().getContentResolver(), uri,
+                new WaysGramApiClient.Callback() {
+                    @Override
+                    public void onSuccess(JSONObject response) {
+                        if (attachButton != null) {
+                            attachButton.setEnabled(true);
+                        }
+                        sendImage(response.optString("id", ""));
+                    }
+
+                    @Override
+                    public void onError(String message, int statusCode) {
+                        if (attachButton != null) {
+                            attachButton.setEnabled(true);
+                        }
+                        statusView.setText(message);
+                    }
+                });
+    }
+
+    private void sendImage(String mediaId) {
+        if (mediaId == null || !mediaId.matches("[a-f0-9]{32}")) {
+            statusView.setText("Сервер вернул некорректный ID изображения.");
+            return;
+        }
+        String caption = messageInput.getText() == null
+                ? ""
+                : messageInput.getText().toString().trim();
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("body", caption.length() == 0 ? "Изображение" : caption);
+            payload.put("media_id", mediaId);
+        } catch (Exception exception) {
+            statusView.setText("Не удалось подготовить изображение к отправке.");
+            return;
+        }
+        sendButton.setEnabled(false);
+        statusView.setText(type == TYPE_GROUP ? "Отправляю изображение в группу…" : "Публикую изображение…");
+        apiClient.post(basePath(), payload, new WaysGramApiClient.Callback() {
+            @Override
+            public void onSuccess(JSONObject response) {
+                messageInput.setText("");
+                sendButton.setEnabled(true);
+                statusView.setText(type == TYPE_GROUP ? "Изображение отправлено." : "Изображение опубликовано.");
+                loadMessages();
+            }
+
+            @Override
+            public void onError(String message, int statusCode) {
+                sendButton.setEnabled(true);
+                statusView.setText(message);
+                if (statusCode == 401) {
+                    WaysGramSessionStore.getInstance(getParentActivity()).clearSession();
+                    presentFragment(new WaysGramLoginFragment(), true);
+                }
+            }
+        });
     }
 
     private void loadMessages() {
@@ -636,6 +733,32 @@ public final class WaysGramTimelineFragment extends BaseFragment {
         );
         params.bottomMargin = AndroidUtilities.dp(4);
         messagesContainer.addView(row, params);
+
+        String mediaId = message.optString("media_id", "");
+        if (mediaId.matches("[a-f0-9]{32}")) {
+            ImageView image = new ImageView(getParentActivity());
+            image.setAdjustViewBounds(true);
+            image.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            image.setMaxHeight(AndroidUtilities.dp(260));
+            image.setMaxWidth(AndroidUtilities.dp(320));
+            LinearLayout.LayoutParams imageParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+            );
+            imageParams.bottomMargin = AndroidUtilities.dp(8);
+            messagesContainer.addView(image, imageParams);
+            apiClient.downloadImage(mediaId, new WaysGramApiClient.ImageCallback() {
+                @Override
+                public void onSuccess(Bitmap bitmap) {
+                    image.setImageBitmap(bitmap);
+                }
+
+                @Override
+                public void onError(String message, int statusCode) {
+                    image.setContentDescription("Изображение недоступно");
+                }
+            });
+        }
     }
 
     private void sendMessage() {

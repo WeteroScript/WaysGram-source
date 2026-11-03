@@ -311,11 +311,17 @@ public final class WaysGramGiftCatalogSheet extends BottomSheet {
         void bind(WaysGramGiftCatalogClient.Gift gift, @Nullable Bitmap sticker) {
             titleView.setText(gift.title);
             priceView.setText(gift.starCount + " Telegram Stars");
-            if (gift.limited && gift.remainingCount != null && gift.totalCount != null) {
+            if (gift.auction) {
+                stockView.setText("Аукционный тип подарка");
+                stockView.setVisibility(View.VISIBLE);
+            } else if (gift.soldOut) {
+                stockView.setText("Распродан");
+                stockView.setVisibility(View.VISIBLE);
+            } else if (gift.limited && gift.remainingCount != null && gift.totalCount != null) {
                 stockView.setText("Осталось " + gift.remainingCount + " из " + gift.totalCount);
                 stockView.setVisibility(View.VISIBLE);
             } else if (gift.premium) {
-                stockView.setText("Premium");
+                stockView.setText("Требуется Premium");
                 stockView.setVisibility(View.VISIBLE);
             } else {
                 stockView.setVisibility(View.GONE);

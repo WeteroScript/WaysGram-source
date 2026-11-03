@@ -1,16 +1,12 @@
 # WaysGram
 
-Исходный репозиторий клиентского приложения WaysGram.
+Android-клиент на основе закреплённого исходного кода Telegram for Android и отдельного WaysGram REST backend.
 
-## Текущий статус
+## Исходный Android-клиент
 
-Официальный Android source подключён как Git submodule `android/telegram-upstream` и закреплён на коммите `3de37c8cfb039452be7398909461da6288babf15` — Telegram for Android 13.1.1 (build 7237), соответствующем предоставленному ZIP. Исходники не копируются в этот репозиторий целиком; checkout submodule воспроизводится по зафиксированному коммиту.
+Android source подключён как Git submodule `android/telegram-upstream` и закреплён на коммите `3de37c8cfb039452be7398909461da6288babf15` — Telegram for Android 13.1.1 (build 7237).
 
-WaysGram overlay уже содержит отдельный вход по виртуальному номеру и одноразовому коду AuthWaysGram_bot, Android Keystore-хранилище сессии, стартовый профильный экран, каталог подарков, список личных диалогов, простой текстовый DM-экран, списки групп и каналов, а также текстовые ленты групп/каналов. Патчер подготовки исходников перенаправляет начальный фрагмент LaunchActivity на WaysGram login/home вместо Telegram LoginActivity/MainTabsActivity. Следующие работы — перенос остальных UI и сервисных функций, медиа, доставки уведомлений, звонков, настроек, создания/управления группами/каналами и внутренними ботами.
-
-## Android source checkout
-
-Для полной копии Android-исходников вместе с upstream submodules:
+Подготовка исходников:
 
 ```bash
 git clone --recurse-submodules https://github.com/WeteroScript/WaysGram-source.git
@@ -18,28 +14,37 @@ cd WaysGram-source
 bash scripts/prepare-android-source.sh
 ```
 
-Путь Android-проекта: `android/telegram-upstream`. Если репозиторий уже клонирован без submodules, скрипт их инициализирует. Он также копирует WaysGram overlay-классы в рабочую копию Android-проекта и добавляет отдельную кнопку каталога в исходный экран подарков. `WaysGramGiftCatalogClient` читает `/api/telegram/gifts` и получает файлы стикеров через защищённый WaysGram proxy; `WaysGramSessionStore` хранит сессию через Android Keystore. WaysGram Android overlays now include group member/admin controls, channel admin management, and four-second incremental HTTP polling in open text conversations. The home screen also includes an internal BotFather UI for creating bots, listing owned bots, editing command menus, resetting tokens and disabling bots. A bot details screen also opens its internal chat, which uses the bot message/update API. Users can also open a public bot by username and start a chat. Direct messages and group/channel timelines support static image and PDF/TXT/CSV attachments. The system document picker is used to select outgoing files and save incoming documents; polling stops when the screen is paused. Animated images and video are not supported yet. WaysGram virtual-number login is available from the initial startup fragment and stores the returned session using Android Keystore. Новый экран входа по умолчанию использует `https://bot-1793554244-6434-weterochina.bothost.tech` как API base URL; адрес остаётся редактируемым. Это настройка клиента, а не подтверждение того, что API уже развёрнут и отвечает. Сам APK на этом этапе не собирается.
+Скрипт проверяет закреплённую версию и копирует классы WaysGram REST overlay в Android-проект. Проверка исходников не изменяет оригинальные `LaunchActivity`, `LoginActivity`, `MainTabsActivity` или `GiftSheet`. Штатная навигация, экран входа и экран подарков Telegram остаются исходными. Launcher icon, upstream API settings, Google services и manifest declarations сохраняются; меняются только имя приложения и application id для отдельной установки WaysGram.
 
-## Связанные компоненты
+## AuthBot и текущий REST backend
 
-- [WaysGram AuthBot и HTTP API](https://github.com/WeteroScript/WaysGram-AuthBot)
-- [Аудит исходного ZIP и текущие ограничения](docs/AUDIT.md)
+Связанный сервер: [WaysGram AuthBot](https://github.com/WeteroScript/WaysGram-AuthBot).
 
-## Зафиксированные требования
+Сервер предоставляет REST API для внутренней системы WaysGram: виртуальные номера, проверку одноразового кода через `@AuthWaysGram_bot`, профиль, личные сообщения, группы, каналы, вложения, внутренние боты, балансы и инвентарь подарков.
 
-- Бренд приложения: WaysGram.
-- Исходный интерфейс должен сохраняться без самовольного редизайна.
-- Авторизация: виртуальный номер и одноразовый код через `@AuthWaysGram_bot`.
-- Сессия приложения хранится на сервере до истечения срока или выхода.
-- Пользовательские данные и операции хранятся в собственной SQL-базе AuthBot.
-- Новый аккаунт получает 5 000 внутренних Stars и 15 внутренних Gramm один раз.
-- Каталог подарков, аукционы, группы и BotFather должны работать через собственный backend.
-- Цель первого запуска — локальное тестирование в Termux; затем перенос на VPS.
+Адрес, заданный в Android REST-клиенте по умолчанию:
 
-## Сборка Android
+```
+https://bot-1793554244-6434-weterochina.bothost.tech
+```
 
-Android-проект находится в submodule, WaysGram-адаптация продолжается. На текущем этапе APK не собирается; CI проверяет патчеры и исходные контракты, но не запускает Gradle assemble. Требования к Android SDK/NDK и Gradle, а также ограничения исходного ZIP описаны в [аудите](docs/AUDIT.md). APK будет собираться только после завершения интеграции AuthBot/API и клиентских тестов.
+Это адрес API в конфигурации клиента. Сам по себе он не подтверждает доступность каждого маршрута или полную интеграцию приложения.
 
-## Безопасность и конфигурация
+**Граница текущей авторизации:** номер формата `+1XXXXXXXXXX` — внутренний виртуальный идентификатор WaysGram, а код из AuthBot создаёт REST-сессию WaysGram. Это не код входа в личный аккаунт Telegram и не MTProto authorization key. В оригинальном Telegram-клиенте вход по-прежнему выполняется штатным механизмом Telegram через `auth.sendCode` / `auth.signIn`.
 
-Секреты `BOT_TOKEN`, `INTERNAL_API_TOKEN`, `OTP_FERNET_KEY`, ключи подписи APK и серверные пароли нельзя коммитить в Git. Они задаются через локальный `.env` или секреты окружения.
+## Ограничение серверной совместимости
+
+Нынешний AuthBot — FastAPI/SQLite REST backend. Он не реализует Telegram MTProto Data Centers и полный набор Telegram RPC-методов, объектов, обновлений, медиа и синхронизации, которые ожидает оригинальный Android-клиент.
+
+Поэтому текущий REST API может обслуживать данные WaysGram через собственные клиентские API-вызовы, но не может быть подключён простой заменой адреса базы или адреса сервера в Telegram-клиенте. Для использования оригинальных экранов Telegram с полностью собственными аккаунтами и данными требуется MTProto-совместимая серверная инфраструктура и реализация используемых клиентом методов. Без неё подмена Telegram login на проверку REST-кода не создаёт Telegram-сессию и ломает штатные функции после входа.
+
+## Сборка и проверки
+
+- `scripts/apply-android-patches.py` проверяет, что оригинальные точки входа и экран подарков не были изменены.
+- `scripts/prepare_android_dev_build.py` настраивает имя и package WaysGram, не меняя исходные Telegram API-настройки, сервисы, manifest или launcher icon.
+- `.github/workflows/source-check.yml` проверяет скрипты и контракт исходников.
+- `.github/workflows/android-apk.yml` содержит отдельный workflow сборки debug APK. Сам факт наличия workflow не является подтверждением успешной сборки; ориентироваться нужно на результат конкретного запуска.
+
+## Секреты
+
+`BOT_TOKEN`, `INTERNAL_API_TOKEN`, `OTP_FERNET_KEY`, ключи подписи APK и пароли сервера должны храниться только в переменных окружения или GitHub Secrets и не должны попадать в Git.

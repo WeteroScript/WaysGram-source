@@ -113,7 +113,7 @@ The Android UI currently opens the system image picker and displays downloaded i
 
 ## Message refresh
 
-Direct messages and group/channel timelines poll their authenticated history routes every four seconds using the incremental `after_id` cursor. Polling starts immediately when the screen resumes and stops while the screen is paused or the app is in the background. This gives an open screen near-real-time text refresh without requiring a manual reload. It is HTTP polling, not WebSocket or push delivery; background notifications and delivery while the app is closed remain separate work.
+Direct messages, group/channel timelines and internal bot chats use bounded HTTP long polling with the incremental `after_id` cursor and `wait_seconds=20`. The server holds the request for up to 20 seconds and returns as soon as new messages arrive. The Android client allows a 30-second read timeout, retries after a short delay, and stops polling while the screen is paused or the app is in the background. This improves foreground delivery but is not WebSocket or push delivery; background notifications and delivery while the app is closed remain separate work.
 
 ## Telegram gift catalogue
 

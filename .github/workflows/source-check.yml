@@ -63,6 +63,7 @@ jobs:
           grep -q 'apiClient.put' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramBotDetailFragment.java
           grep -q 'token_notice' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramBotsFragment.java
           grep -q 'new WaysGramBotChatFragment' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramBotDetailFragment.java
+          grep -q '/api/bots/by-username/' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramBotsFragment.java
           grep -q 'Участники и права группы' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
           grep -q '"/api/groups/"' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
           grep -q '"/api/channels/"' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java

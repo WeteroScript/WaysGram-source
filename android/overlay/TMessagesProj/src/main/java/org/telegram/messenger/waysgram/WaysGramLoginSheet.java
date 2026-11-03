@@ -1,0 +1,257 @@
+package org.telegram.messenger.waysgram;
+
+import android.content.Context;
+import android.graphics.Typeface;
+import android.text.InputType;
+import android.view.Gravity;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import org.telegram.messenger.AndroidUtilities;
+import org.telegram.ui.ActionBar.BottomSheet;
+import org.telegram.ui.ActionBar.Theme;
+
+/**
+ * Standalone WaysGram login sheet using internal virtual numbers and
+ * one-time codes delivered by AuthWaysGram_bot.
+ *
+ * No Telegram auth code, phone login, or Telegram account session is touched.
+ */
+public final class WaysGramLoginSheet extends BottomSheet {
+    private final WaysGramSessionStore sessionStore;
+    private WaysGramAuthClient authClient;
+
+    private final EditText apiBaseInput;
+    private final EditText virtualNumberInput;
+    private final EditText codeInput;
+    private final TextView statusView;
+    private final Button requestCodeButton;
+    private final Button verifyButton;
+
+    public WaysGramLoginSheet(
+            Context context,
+            WaysGramSessionStore sessionStore,
+            Theme.ResourcesProvider resourcesProvider
+    ) {
+        super(context, false, resourcesProvider);
+        if (sessionStore == null) {
+            throw new IllegalArgumentException("WaysGramSessionStore is required");
+        }
+        this.sessionStore = sessionStore;
+
+        setTitle("Вход в WaysGram", true);
+        setApplyTopPadding(false);
+        setApplyBottomPadding(true);
+
+        LinearLayout content = new LinearLayout(context);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(
+                AndroidUtilities.dp(20),
+                AndroidUtilities.dp(8),
+                AndroidUtilities.dp(20),
+                AndroidUtilities.dp(20)
+        );
+
+        TextView explanation = new TextView(context);
+        explanation.setText(
+                "Введите внутренний номер WaysGram, который вы получили в AuthWaysGram_bot. " +
+                "Код подтверждения также приходит в этот бот. Это код WaysGram, не код входа в Telegram."
+        );
+        explanation.setTextSize(14);
+        explanation.setTextColor(Theme.getColor(Theme.key_dialogTextGray2, resourcesProvider));
+        explanation.setLineSpacing(AndroidUtilities.dp(3), 1.0f);
+        content.addView(explanation, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+
+        apiBaseInput = addField(
+                context,
+                content,
+                "Адрес WaysGram API",
+                InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI
+        );
+        String savedBase = sessionStore.getApiBaseUrl();
+        apiBaseInput.setText(savedBase != null ? savedBase : "http://127.0.0.1:8081");
+        apiBaseInput.setSingleLine(true);
+
+        virtualNumberInput = addField(
+                context,
+                content,
+                "Внутренний номер (+1 и 10 цифр)",
+                InputType.TYPE_CLASS_PHONE
+        );
+        virtualNumberInput.setSingleLine(true);
+
+        requestCodeButton = new Button(context);
+        requestCodeButton.setText("Запросить код в AuthWaysGram_bot");
+        content.addView(requestCodeButton, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+
+        codeInput = addField(
+                context,
+                content,
+                "Шестизначный код из AuthWaysGram_bot",
+                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL
+        );
+        codeInput.setSingleLine(true);
+        codeInput.setMaxEms(6);
+
+        verifyButton = new Button(context);
+        verifyButton.setText("Войти в WaysGram");
+        content.addView(verifyButton, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+
+        statusView = new TextView(context);
+        statusView.setText("Сначала запросите код. Он будет отправлен в AuthWaysGram_bot.");
+        statusView.setTextSize(13);
+        statusView.setTextColor(Theme.getColor(Theme.key_dialogTextGray2, resourcesProvider));
+        statusView.setGravity(Gravity.CENTER);
+        statusView.setPadding(0, AndroidUtilities.dp(10), 0, 0);
+        content.addView(statusView, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+
+        setCustomView(content);
+        requestCodeButton.setOnClickListener(view -> requestCode());
+        verifyButton.setOnClickListener(view -> verifyCode());
+        verifyButton.setEnabled(false);
+        requestCodeButton.setEnabled(true);
+
+        setOnDismissListener(dialog -> closeClient());
+    }
+
+    private EditText addField(Context context, LinearLayout parent, String hint, int inputType) {
+        EditText input = new EditText(context);
+        input.setSingleLine(true);
+        input.setHint(hint);
+        input.setInputType(inputType);
+        input.setTextSize(16);
+        input.setPadding(AndroidUtilities.dp(12), AndroidUtilities.dp(8),
+                AndroidUtilities.dp(12), AndroidUtilities.dp(8));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        params.topMargin = AndroidUtilities.dp(12);
+        parent.addView(input, params);
+        return input;
+    }
+
+    private WaysGramAuthClient getClient() {
+        String base = apiBaseInput.getText() == null
+                ? ""
+                : apiBaseInput.getText().toString().trim();
+        if (authClient == null) {
+            authClient = new WaysGramAuthClient(base, sessionStore);
+        }
+        return authClient;
+    }
+
+    private String getNumber() {
+        return virtualNumberInput.getText() == null
+                ? ""
+                : virtualNumberInput.getText().toString().trim();
+    }
+
+    private void requestCode() {
+        String number = getNumber();
+        String base = apiBaseInput.getText() == null
+                ? ""
+                : apiBaseInput.getText().toString().trim();
+        if (number.length() == 0 || base.length() == 0) {
+            statusView.setText("Заполните адрес API и внутренний номер.");
+            return;
+        }
+        closeClient();
+        try {
+            authClient = new WaysGramAuthClient(base, sessionStore);
+        } catch (IllegalArgumentException exception) {
+            statusView.setText(exception.getMessage());
+            return;
+        }
+
+        setBusy(true);
+        statusView.setText("Отправляю запрос в WaysGram…");
+        authClient.requestCode(number, new WaysGramAuthClient.Callback() {
+            @Override
+            public void onSuccess(org.json.JSONObject response) {
+                setBusy(false);
+                verifyButton.setEnabled(true);
+                statusView.setText(
+                        "Запрос принят. Откройте AuthWaysGram_bot и нажмите «Получить код», затем введите его здесь."
+                );
+            }
+
+            @Override
+            public void onError(String message) {
+                setBusy(false);
+                statusView.setText(message);
+            }
+        });
+    }
+
+    private void verifyCode() {
+        String number = getNumber();
+        String code = codeInput.getText() == null
+                ? ""
+                : codeInput.getText().toString().trim();
+        if (authClient == null) {
+            statusView.setText("Сначала запросите код.");
+            return;
+        }
+        setBusy(true);
+        statusView.setText("Проверяю код WaysGram…");
+        authClient.verifyCode(number, code, new WaysGramAuthClient.LoginCallback() {
+            @Override
+            public void onSuccess(org.json.JSONObject user, long expiresAt) {
+                setBusy(false);
+                String displayName = user.optString("display_name", "");
+                if (displayName.length() == 0) {
+                    displayName = user.optString("username", "");
+                }
+                statusView.setText("Вход выполнен" +
+                        (displayName.length() > 0 ? ": " + displayName : "") + ".");
+                Toast.makeText(getContext(), "Сессия WaysGram сохранена", Toast.LENGTH_SHORT).show();
+                dismiss();
+            }
+
+            @Override
+            public void onError(String message) {
+                setBusy(false);
+                statusView.setText(message);
+            }
+        });
+    }
+
+    private void setBusy(boolean busy) {
+        requestCodeButton.setEnabled(!busy);
+        verifyButton.setEnabled(!busy && authClient != null);
+        apiBaseInput.setEnabled(!busy);
+        virtualNumberInput.setEnabled(!busy);
+        codeInput.setEnabled(!busy);
+    }
+
+    private void closeClient() {
+        if (authClient != null) {
+            authClient.close();
+            authClient = null;
+        }
+    }
+
+    @Override
+    public void dismiss() {
+        closeClient();
+        super.dismiss();
+    }
+}

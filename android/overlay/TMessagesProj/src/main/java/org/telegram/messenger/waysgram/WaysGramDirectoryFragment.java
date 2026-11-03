@@ -19,6 +19,7 @@ import org.telegram.ui.ActionBar.Theme;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 
 /** Server-backed WaysGram directory for DMs, groups and channels. */
 public final class WaysGramDirectoryFragment extends BaseFragment {
@@ -171,10 +172,27 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
 
     private void createDirectoryItem() {
         String title = primaryInput.getText() == null ? "" : primaryInput.getText().toString().trim();
-        String username = usernameInput.getText() == null ? "" : usernameInput.getText().toString().trim();
+        String username = usernameInput.getText() == null
+                ? ""
+                : usernameInput.getText().toString().trim().replaceFirst("^@", "").toLowerCase(Locale.US);
         if (title.length() == 0) {
             statusView.setText("Введите название");
             return;
+        }
+        if (type == TYPE_CHANNELS && username.length() == 0) {
+            statusView.setText("Для канала укажите username.");
+            return;
+        }
+        if (username.length() > 0) {
+            boolean validUsername = type == TYPE_GROUPS
+                    ? username.matches("[a-z][a-z0-9_]{3,31}")
+                    : username.matches("[a-z][a-z0-9_]{0,31}");
+            if (!validUsername) {
+                statusView.setText(type == TYPE_GROUPS
+                        ? "Username группы: 4–32 символа, латиница, цифры и _, первый символ — буква."
+                        : "Username канала: 1–32 символа, латиница, цифры и _, первый символ — буква.");
+                return;
+            }
         }
         JSONObject payload = new JSONObject();
         try {

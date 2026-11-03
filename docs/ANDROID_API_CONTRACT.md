@@ -1,90 +1,73 @@
-# WaysGram Android API contract: Telegram gift catalog
+# WaysGram Android API contract
 
-Status: MTProto-first backend route and Android read-only gift UI are implemented in source. The overlay is reachable from WaysGram home and from a separate entry in the upstream gift sheet after login.
+## API origin
 
-Android gift client: `WaysGramGiftCatalogClient.java`.
-Encrypted WaysGram session: `WaysGramSessionStore.java`.
-Read-only catalog sheet: `WaysGramGiftCatalogSheet.java`.
-WaysGram auth screen stores the server-issued Bearer token in the session store after successful internal OTP verification. The client callbacks are delivered on the Android main thread by their handler.
+The Android login screen defaults to:
 
-## Catalog
+```
+https://bot-1793554244-6434-weterochina.bothost.tech
+```
 
-Authenticated request:
+The address is editable in the login sheet. A successful login stores the selected API origin and the WaysGram Bearer token together in Android Keystore-backed encrypted preferences. The configured origin is a client default only; it does not establish that the hosting service is deployed or healthy. The host must proxy the root-level `/api/*`, `/health`, and protected `/internal/*` paths to the FastAPI service without stripping the `/api` prefix.
+
+## Authentication
+
+The client uses the app's own virtual-number system. Numbers are internal WaysGram identifiers, not real mobile numbers.
 
 ```http
-GET /api/telegram/gifts
+POST /api/auth/request-code
+Content-Type: application/json
+
+{"phone":"+1XXXXXXXXXX"}
+```
+
+The number must already be assigned and verified through `@AuthWaysGram_bot`. The user requests the one-time WaysGram code in that bot.
+
+```http
+POST /api/auth/verify-code
+Content-Type: application/json
+
+{"phone":"+1XXXXXXXXXX","code":"123456"}
+```
+
+The response contains `token`, `expires_at`, and `user`. The Android client stores the token with the selected API origin. It does not request or use a Telegram personal-account login code or Telegram user session.
+
+## Implemented client calls
+
+All authenticated requests use:
+
+```http
 Authorization: Bearer <waysgram-session-token>
 ```
 
-The endpoint refreshes the persisted catalog when its last successful sync is older than 60 seconds. If Telegram is temporarily unavailable, it returns the last cached snapshot and marks it `stale: true`. On a first-ever fetch failure, the endpoint returns HTTP 503.
+The current Android overlay calls these API areas:
 
-Example response shape:
+- Profile and wallet: `GET /api/me`, `GET /api/me/wallet`.
+- User lookup: `GET /api/users?q=...`.
+- Personal messages: `GET /api/messages` and `POST /api/messages`.
+- Groups: `GET /api/groups`, `POST /api/groups`, group history and text-post routes.
+- Channels: `GET /api/channels`, `POST /api/channels`, channel history and text-post routes.
+- Telegram gift catalogue: `GET /api/telegram/gifts`.
+- Gift stickers: `GET /api/telegram/gifts/{gift_id}/sticker`.
 
-```json
-{
-  "source": "telegram_bot_api",
-  "scope": "gifts_available_to_authbot",
-  "currency": "telegram_stars",
-  "synced_at": 1793650000,
-  "stale": false,
-  "count": 1,
-  "gifts": [
-    {
-      "id": "gift_123",
-      "source": "telegram",
-      "title": "🎁",
-      "emoji": "🎁",
-      "star_count": 25,
-      "currency": "telegram_stars",
-      "upgrade_star_count": 100,
-      "is_premium": false,
-      "has_colors": false,
-      "is_limited": true,
-      "total_count": 5000,
-      "remaining_count": 4500,
-      "personal_total_count": 100,
-      "personal_remaining_count": 90,
-      "unique_gift_variant_count": 12,
-      "background": null,
-      "publisher_chat": null,
-      "sticker": {
-        "type": "regular",
-        "set_name": "TelegramGifts",
-        "width": 512,
-        "height": 512,
-        "is_animated": false,
-        "is_video": false,
-        "mime_type": "image/webp",
-        "url": "/api/telegram/gifts/gift_123/sticker"
-      },
-      "synced_at": 1793650000
-    }
-  ]
-}
-```
+The Android screens currently cover text-only messaging and the initial group/channel workflow. Media, push/WebSocket delivery, calls, complete moderation/member-management screens, and the in-app BotFather interface are not complete.
 
-The title is a presentation fallback because the Bot API's `Gift` object exposes the representative sticker, not the same complete title/metadata set as MTProto `StarGift`. The client should display the sticker prominently and avoid treating the fallback as an official product name.
+## Telegram gift catalogue
 
-## Sticker loading
+The primary server source is bot-authenticated MTProto. When `TELEGRAM_API_ID` and `TELEGRAM_API_HASH` are configured, AuthBot starts a Telethon client using `BOT_TOKEN` and calls Telegram's `payments.getStarGifts`. The MTProto session belongs to the configured bot; WaysGram users do not provide Telegram credentials, personal login codes, or account sessions.
 
-Every sticker URL is relative to the WaysGram API host and requires the same Bearer session:
+The backend stores the gift metadata separately from the internal WaysGram gift inventory. The response identifies the source as `telegram_mtproto`, keeps prices in `telegram_stars`, and includes available metadata such as sticker information, limits, supply, upgrade and resale attributes, and auction flags when Telegram supplies them.
 
-```http
-GET /api/telegram/gifts/{gift_id}/sticker
-Authorization: Bearer <waysgram-session-token>
-```
+If MTProto credentials are absent or the MTProto bot connection is unavailable, AuthBot falls back to Bot API `getAvailableGifts`. That fallback is only the subset of gifts available to the configured bot and must not be described as the full MTProto catalogue.
 
-The route asks Telegram's Bot API for the file path and streams the sticker bytes through AuthBot. Do not put the AuthBot token or Telegram `file_id` into the Android app. Respect the returned `mime_type`; Telegram stickers can be static, animated, or video-based.
+Sticker bytes are retrieved server-side and streamed through the authenticated sticker proxy. The Android client never receives the bot token or raw Telegram document credentials. Catalog refresh is cached by the backend; a temporary upstream failure should not be represented as a successful fresh sync.
 
-## Currency and purchase separation
+Telegram Stars amounts in this catalogue are not internal WaysGram Stars or Gram. The catalogue view is read-only and does not perform Telegram purchases or transfers.
 
-- `star_count` and `upgrade_star_count` are Telegram Stars amounts.
-- These values do not represent internal WaysGram Stars or Gram.
-- `GET /api/telegram/gifts` is a read-only catalogue endpoint. It does not send, purchase, upgrade, transfer, or bid on a Telegram gift.
-- The existing `GET /api/gifts` and `POST /api/gifts/{id}/purchase` routes continue to use the internal WaysGram Gram catalogue and inventory.
+## Server configuration and deployment
 
-## Source limitation
+The AuthBot service requires its own environment configuration, including `BOT_TOKEN`, `OTP_FERNET_KEY`, `INTERNAL_API_TOKEN`, and `ADMIN_ID`. Configure `TELEGRAM_API_ID` and `TELEGRAM_API_HASH` to enable the full MTProto gift catalogue. Keep all secrets on the server and out of the Android app and Git history.
 
-The backend calls official Bot API `getAvailableGifts`, which returns gifts available for the configured AuthBot to send. It does not provide the complete MTProto `payments.getStarGifts` data model, auction flags/state, resale lots, or all collectible attributes. Do not infer missing MTProto-only fields from sticker metadata.
+The host must run the FastAPI/Aiogram service and preserve the API paths expected above. Validate `GET /health`, authentication, profile, message, group, channel and sticker-proxy routes against the actual deployment before calling the integration operational.
 
-The provided Android source fetches the full client catalogue through `StarsController.loadStarGifts()` → `getStarGiftsRemote()` → `TL_stars.getStarGifts`. The Android UI will be wired to the new WaysGram route during the client integration phase, preserving the existing gift UI layout.
+No APK build is part of this source-only stage.

@@ -55,7 +55,13 @@ public final class WaysGramAuthClient implements AutoCloseable {
     }
 
     public void requestCode(String virtualNumber, Callback callback) {
-        final String number = normalizeNumber(virtualNumber);
+        final String number;
+        try {
+            number = normalizeNumber(virtualNumber);
+        } catch (Exception exception) {
+            deliverError(callback, safeMessage(exception));
+            return;
+        }
         execute(callback, () -> {
             JSONObject payload = new JSONObject();
             payload.put("phone", number);

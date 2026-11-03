@@ -50,7 +50,7 @@ The current Android overlay calls these API areas:
 - Telegram gift catalogue: `GET /api/telegram/gifts`.
 - Gift stickers: `GET /api/telegram/gifts/{gift_id}/sticker`.
 
-The Android screens currently cover text-only messaging and the initial group/channel workflow. Media, push/WebSocket delivery, calls, complete moderation/member-management screens, and the in-app BotFather interface are not complete.
+The Android screens now support text and static image attachments in direct messages and group/channel timelines. Animated images, video, documents, push/WebSocket delivery, calls, and background notifications are not implemented.
 
 ## Group and channel management
 
@@ -84,6 +84,32 @@ The internal bot token is a bearer credential. Store it privately; do not paste 
 The Android bot detail screen also opens a user-to-bot chat using `POST /api/bots/{bot_id}/messages` and `GET /api/bots/{bot_id}/messages?after_id=...`. Open chats poll every four seconds. The first outgoing message creates the chat/update queue. Incoming bot replies appear after a connected bot client posts them through the internal `sendMessage` route.
 
 These bots belong to WaysGram's internal registry. They are not Telegram Bot API bots and the server does not execute arbitrary user-supplied programs. A separate controlled runtime/webhook architecture would be required before hosted custom bot code could be supported.
+
+## Image attachments
+
+Authenticated image upload:
+
+```http
+POST /api/media/images
+Authorization: Bearer <waysgram-session-token>
+Content-Type: image/jpeg | image/png | image/webp
+
+<raw image bytes>
+```
+
+The server accepts static JPEG, PNG and WebP only. It decodes and re-encodes images, strips metadata, rejects animated files, limits the incoming file to 10 MiB, limits each side to 8192 pixels and total resolution to 40 megapixels, and applies account quotas (100 MiB stored and 30 uploads per hour).
+
+A successful upload returns an opaque `id`. Attach it to a message with `media_id`:
+
+- `POST /api/messages`
+- `POST /api/groups/{group_id}/messages`
+- `POST /api/channels/{channel_id}/messages` (channel owner/admin only)
+
+An empty caption becomes the server text label `Изображение`. The message history returns `media_id` when an attachment exists. Download through `GET /api/media/{media_id}` with the same Bearer session. Only the uploader, direct-message participants, group members, or authenticated users of a channel containing the image can retrieve it.
+
+Files are stored in `waysgram_media` beside the configured SQLite database. Keep that directory on persistent storage and include it in backups; the Docker Compose `/data` volume covers both the database and media directory.
+
+The Android UI currently opens the system image picker and displays downloaded images in the message timeline. Videos, animated images and document attachments remain future work.
 
 ## Message refresh
 

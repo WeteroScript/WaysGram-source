@@ -89,6 +89,9 @@ jobs:
           grep -q 'public void checkServer(Callback callback)' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramAuthClient.java
           grep -q 'setRequestMethod("GET")' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramAuthClient.java
           grep -q 'apiBaseUrl + "/health"' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramAuthClient.java
+          grep -q 'apiBaseUrl + "/api/config"' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramAuthClient.java
+          grep -q 'authbot_delivery_ready' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramAuthClient.java
+          grep -q 'AuthWaysGram_bot подключён' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramLoginSheet.java
           grep -q 'Проверить соединение с сервером' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramLoginSheet.java
           grep -q 'media_type' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramChatFragment.java
           grep -q 'media_name' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java

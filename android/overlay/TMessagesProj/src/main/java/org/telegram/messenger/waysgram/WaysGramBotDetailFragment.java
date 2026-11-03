@@ -87,6 +87,12 @@ public final class WaysGramBotDetailFragment extends BaseFragment {
         copyButton.setOnClickListener(view -> copyToken());
         tokenView.setTag(copyButton);
 
+        Button chatButton = button(context, "Открыть чат с ботом");
+        root.addView(chatButton, matchWrap());
+        chatButton.setOnClickListener(view -> presentFragment(
+                new WaysGramBotChatFragment(botId, botTitle), false
+        ));
+
         TextView commandHeading = label("Команды бота", 17, true);
         root.addView(commandHeading, matchWrap());
         commandsContainer = new LinearLayout(context);

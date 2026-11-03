@@ -6,7 +6,7 @@
 
 Официальный Android source подключён как Git submodule `android/telegram-upstream` и закреплён на коммите `3de37c8cfb039452be7398909461da6288babf15` — Telegram for Android 13.1.1 (build 7237), соответствующем предоставленному ZIP. Исходники не копируются в этот репозиторий целиком; checkout submodule воспроизводится по зафиксированному коммиту.
 
-Клиент ещё не адаптирован до WaysGram. Следующий этап — заменить вход и сетевые операции Telegram на WaysGram AuthBot/API, сохраняя существующий интерфейс и визуальные компоненты. Вход приложения должен использовать только внутренние виртуальные номера и коды WaysGram из `@AuthWaysGram_bot`; приложение не должно запрашивать реальные Telegram login codes.
+WaysGram overlay уже содержит отдельный вход по виртуальному номеру и одноразовому коду AuthWaysGram_bot, Android Keystore-хранилище сессии, стартовый профильный экран, каталог подарков, список личных диалогов, простой текстовый DM-экран, списки групп и каналов, а также текстовые ленты групп/каналов. Патчер подготовки исходников перенаправляет начальный фрагмент LaunchActivity на WaysGram login/home вместо Telegram LoginActivity/MainTabsActivity. Следующие работы — перенос остальных UI и сервисных функций, медиа, доставки уведомлений, звонков, настроек, создания/управления группами/каналами и внутренними ботами.
 
 ## Android source checkout
 
@@ -18,7 +18,7 @@ cd WaysGram-source
 bash scripts/prepare-android-source.sh
 ```
 
-Путь Android-проекта: `android/telegram-upstream`. Если репозиторий уже клонирован без submodules, скрипт их инициализирует. Он также копирует WaysGram overlay-классы в рабочую копию Android-проекта и добавляет отдельную кнопку каталога в исходный экран подарков. `WaysGramGiftCatalogClient` читает `/api/telegram/gifts` и получает файлы стикеров через защищённый WaysGram proxy; `WaysGramSessionStore` хранит сессию через Android Keystore. Полный вход WaysGram и выдача токена из авторизационного экрана ещё подключаются. Сам APK на этом этапе не собирается.
+Путь Android-проекта: `android/telegram-upstream`. Если репозиторий уже клонирован без submodules, скрипт их инициализирует. Он также копирует WaysGram overlay-классы в рабочую копию Android-проекта и добавляет отдельную кнопку каталога в исходный экран подарков. `WaysGramGiftCatalogClient` читает `/api/telegram/gifts` и получает файлы стикеров через защищённый WaysGram proxy; `WaysGramSessionStore` хранит сессию через Android Keystore. WaysGram virtual-number login is available from the initial startup fragment and stores the returned session using Android Keystore. Сам APK на этом этапе не собирается.
 
 ## Связанные компоненты
 
@@ -38,7 +38,7 @@ bash scripts/prepare-android-source.sh
 
 ## Сборка Android
 
-Android-проект находится в submodule, но WaysGram-адаптация ещё продолжается. На текущем этапе APK не собирается. Требования к Android SDK/NDK и Gradle, а также ограничения исходного ZIP описаны в [аудите](docs/AUDIT.md). APK будет собираться только после завершения интеграции AuthBot/API и клиентских тестов.
+Android-проект находится в submodule, WaysGram-адаптация продолжается. На текущем этапе APK не собирается; CI проверяет патчеры и исходные контракты, но не запускает Gradle assemble. Требования к Android SDK/NDK и Gradle, а также ограничения исходного ZIP описаны в [аудите](docs/AUDIT.md). APK будет собираться только после завершения интеграции AuthBot/API и клиентских тестов.
 
 ## Безопасность и конфигурация
 

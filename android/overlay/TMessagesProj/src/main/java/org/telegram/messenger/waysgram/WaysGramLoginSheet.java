@@ -212,7 +212,11 @@ public final class WaysGramLoginSheet extends BottomSheet {
             @Override
             public void onSuccess(org.json.JSONObject response) {
                 setBusy(false);
-                statusView.setText("Сервер WaysGram доступен. API отвечает корректно.");
+                if (response.optBoolean("authbot_delivery_ready", false)) {
+                    statusView.setText("WaysGram API доступен. AuthWaysGram_bot подключён, доставка кодов включена.");
+                } else {
+                    statusView.setText("WaysGram API доступен, но AuthWaysGram_bot не подключён. Запрос кода пока недоступен.");
+                }
             }
 
             @Override

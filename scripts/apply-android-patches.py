@@ -36,6 +36,18 @@ VIEW_BLOCK = """        starsHeaderView.addView(titleStarsView, LayoutHelper.cre
         );"""
 
 
+def patch_source(original: str) -> str:
+    marker = "WaysGram's own catalog is separate from the signed-in Telegram account."
+    if marker in original:
+        return original
+    if IMPORT_ANCHOR not in original:
+        raise ValueError("Cannot find GiftSheet import anchor; upstream source changed.")
+    if VIEW_ANCHOR not in original:
+        raise ValueError("Cannot find GiftSheet header anchor; upstream source changed.")
+    updated = original.replace(IMPORT_ANCHOR, IMPORTS, 1)
+    return updated.replace(VIEW_ANCHOR, VIEW_BLOCK, 1)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--android-root", required=True, type=Path)
@@ -45,21 +57,16 @@ def main() -> None:
     if not source.is_file():
         raise SystemExit(f"GiftSheet.java not found: {source}")
 
-    content = source.read_text(encoding="utf-8")
-    marker = "WaysGram's own catalog is separate from the signed-in Telegram account."
-    if marker in content:
+    original = source.read_text(encoding="utf-8")
+    try:
+        updated = patch_source(original)
+    except ValueError as exception:
+        raise SystemExit(str(exception)) from exception
+    if updated != original:
+        source.write_text(updated, encoding="utf-8")
+        print("Applied WaysGram gift catalog entry to GiftSheet.java.")
+    else:
         print("WaysGram gift catalog entry already applied.")
-        return
-
-    if IMPORT_ANCHOR not in content:
-        raise SystemExit("Cannot find GiftSheet import anchor; upstream source changed.")
-    if VIEW_ANCHOR not in content:
-        raise SystemExit("Cannot find GiftSheet header anchor; upstream source changed.")
-
-    content = content.replace(IMPORT_ANCHOR, IMPORTS, 1)
-    content = content.replace(VIEW_ANCHOR, VIEW_BLOCK, 1)
-    source.write_text(content, encoding="utf-8")
-    print("Applied WaysGram gift catalog entry to GiftSheet.java.")
 
 
 if __name__ == "__main__":

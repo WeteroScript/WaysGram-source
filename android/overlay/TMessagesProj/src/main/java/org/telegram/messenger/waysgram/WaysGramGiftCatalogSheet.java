@@ -26,8 +26,10 @@ import org.telegram.ui.ActionBar.Theme;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Read-only WaysGram Telegram gift catalogue sheet.
@@ -137,7 +139,6 @@ public final class WaysGramGiftCatalogSheet extends BottomSheet {
                     statusView.setText(gifts.isEmpty()
                             ? state + " · подарков нет"
                             : state + " · " + gifts.size() + " подарков");
-                    loadStaticStickers(gifts);
                 });
             }
 
@@ -154,38 +155,10 @@ public final class WaysGramGiftCatalogSheet extends BottomSheet {
         });
     }
 
-    private void loadStaticStickers(List<WaysGramGiftCatalogClient.Gift> gifts) {
-        for (WaysGramGiftCatalogClient.Gift gift : gifts) {
-            if (gift.animatedSticker || gift.videoSticker) {
-                continue;
-            }
-            catalogClient.downloadSticker(gift, new WaysGramGiftCatalogClient.StickerCallback() {
-                @Override
-                public void onLoaded(byte[] bytes, String mimeType) {
-                    Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-                    if (bitmap == null) {
-                        return;
-                    }
-                    AndroidUtilities.runOnUIThread(() -> {
-                        if (!isDismissed()) {
-                            adapter.setSticker(gift.id, bitmap);
-                        } else {
-                            bitmap.recycle();
-                        }
-                    });
-                }
-
-                @Override
-                public void onError(String message) {
-                    // Keep the emoji placeholder if Telegram cannot deliver this sticker.
-                }
-            });
-        }
-    }
-
     private final class GiftAdapter extends RecyclerView.Adapter<GiftHolder> {
         private final ArrayList<WaysGramGiftCatalogClient.Gift> items = new ArrayList<>();
         private final Map<String, Bitmap> stickers = new HashMap<>();
+        private final Set<String> requestedStickers = new HashSet<>();
 
         void setItems(List<WaysGramGiftCatalogClient.Gift> gifts) {
             items.clear();
@@ -218,6 +191,35 @@ public final class WaysGramGiftCatalogSheet extends BottomSheet {
         public void onBindViewHolder(@NonNull GiftHolder holder, int position) {
             WaysGramGiftCatalogClient.Gift gift = items.get(position);
             holder.bind(gift, stickers.get(gift.id));
+            requestSticker(gift);
+        }
+
+        private void requestSticker(WaysGramGiftCatalogClient.Gift gift) {
+            if (gift.animatedSticker || gift.videoSticker || gift.stickerUrl.length() == 0
+                    || stickers.containsKey(gift.id) || !requestedStickers.add(gift.id)) {
+                return;
+            }
+            catalogClient.downloadSticker(gift, new WaysGramGiftCatalogClient.StickerCallback() {
+                @Override
+                public void onLoaded(byte[] bytes, String mimeType) {
+                    Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                    if (bitmap == null) {
+                        return;
+                    }
+                    AndroidUtilities.runOnUIThread(() -> {
+                        if (!isDismissed()) {
+                            setSticker(gift.id, bitmap);
+                        } else {
+                            bitmap.recycle();
+                        }
+                    });
+                }
+
+                @Override
+                public void onError(String message) {
+                    // Keep the emoji placeholder if Telegram cannot deliver this sticker.
+                }
+            });
         }
 
         @Override
@@ -232,6 +234,7 @@ public final class WaysGramGiftCatalogSheet extends BottomSheet {
                 }
             }
             stickers.clear();
+            requestedStickers.clear();
             items.clear();
         }
     }

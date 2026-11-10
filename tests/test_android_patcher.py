@@ -27,6 +27,39 @@ class GiftCatalogContractTests(unittest.TestCase):
         )
 
 
+
+class WaysGramDirectoryContractTests(unittest.TestCase):
+    def test_channels_support_private_creation_and_invite_joining(self) -> None:
+        directory_path = (
+            ROOT
+            / "android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/"
+            / "WaysGramDirectoryFragment.java"
+        )
+        source = directory_path.read_text(encoding="utf-8")
+        self.assertIn('privateChannelCheckBox.setText("Приватный канал")', source)
+        self.assertIn('payload.put("is_public", isPublic)', source)
+        self.assertIn('apiClient.post("/api/channels/join"', source)
+        self.assertIn('response.optString("invite_link", "")', source)
+        self.assertIn("setPrimaryClip", source)
+
+    def test_saved_messages_open_the_current_users_own_chat(self) -> None:
+        directory_path = (
+            ROOT
+            / "android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/"
+            / "WaysGramDirectoryFragment.java"
+        )
+        chat_path = (
+            ROOT
+            / "android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/"
+            / "WaysGramChatFragment.java"
+        )
+        directory_source = directory_path.read_text(encoding="utf-8")
+        chat_source = chat_path.read_text(encoding="utf-8")
+        self.assertIn('"Избранное"', directory_source)
+        self.assertIn('apiClient.get("/api/me"', directory_source)
+        self.assertIn('recipient != peerId', chat_source)
+
+
 class SourcePreservationTests(unittest.TestCase):
     def test_gift_sheet_source_is_unchanged(self) -> None:
         original = "import org.telegram.messenger.UserObject;\nclass GiftSheet {}\n"

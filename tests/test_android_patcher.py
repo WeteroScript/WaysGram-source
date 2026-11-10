@@ -28,6 +28,20 @@ class GiftCatalogContractTests(unittest.TestCase):
 
 
 
+class WaysGramGiftCatalogContractTests(unittest.TestCase):
+    def test_gift_stickers_load_lazily_for_visible_rows(self) -> None:
+        sheet_path = (
+            ROOT
+            / "android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/"
+            / "WaysGramGiftCatalogSheet.java"
+        )
+        source = sheet_path.read_text(encoding="utf-8")
+        self.assertIn("requestSticker(gift)", source)
+        self.assertIn("private final Set<String> requestedStickers = new HashSet<>()", source)
+        self.assertIn("!requestedStickers.add(gift.id)", source)
+        self.assertNotIn("loadStaticStickers(gifts)", source)
+
+
 class WaysGramDirectoryContractTests(unittest.TestCase):
     def test_channels_support_private_creation_and_invite_joining(self) -> None:
         directory_path = (

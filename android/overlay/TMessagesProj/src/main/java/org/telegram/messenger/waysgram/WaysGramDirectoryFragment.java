@@ -1,10 +1,13 @@
 package org.telegram.messenger.waysgram;
 
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
@@ -33,6 +36,8 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
     private TextView statusView;
     private EditText primaryInput;
     private EditText usernameInput;
+    private EditText inviteInput;
+    private CheckBox privateChannelCheckBox;
 
     public WaysGramDirectoryFragment(int type) {
         this.type = type;
@@ -127,6 +132,21 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
         ));
+        if (type == TYPE_CHANNELS) {
+            privateChannelCheckBox = new CheckBox(context);
+            privateChannelCheckBox.setText("Приватный канал");
+            root.addView(privateChannelCheckBox, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+            ));
+            privateChannelCheckBox.setOnCheckedChangeListener((button, checked) -> {
+                usernameInput.setVisibility(checked ? View.GONE : View.VISIBLE);
+                if (checked) {
+                    usernameInput.setText("");
+                }
+            });
+        }
+
         Button create = new Button(context);
         create.setText(type == TYPE_GROUPS ? "Создать группу" : "Создать канал");
         root.addView(create, new LinearLayout.LayoutParams(
@@ -134,6 +154,24 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
                 ViewGroup.LayoutParams.WRAP_CONTENT
         ));
         create.setOnClickListener(view -> createDirectoryItem());
+
+        if (type == TYPE_CHANNELS) {
+            inviteInput = new EditText(context);
+            inviteInput.setSingleLine(true);
+            inviteInput.setHint("Ссылка или код приглашения");
+            root.addView(inviteInput, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+            ));
+            Button join = new Button(context);
+            join.setAllCaps(false);
+            join.setText("Вступить по приглашению");
+            root.addView(join, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+            ));
+            join.setOnClickListener(view -> joinChannelByInvite());
+        }
     }
 
     private void searchUsers() {
@@ -183,11 +221,14 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
             statusView.setText("Название должно содержать не более 80 символов.");
             return;
         }
-        if (type == TYPE_CHANNELS && username.length() == 0) {
-            statusView.setText("Для канала укажите username.");
+        boolean isPublic = type != TYPE_CHANNELS
+                || privateChannelCheckBox == null
+                || !privateChannelCheckBox.isChecked();
+        if (type == TYPE_CHANNELS && isPublic && username.length() == 0) {
+            statusView.setText("Для публичного канала укажите username.");
             return;
         }
-        if (username.length() > 0) {
+        if (username.length() > 0 && isPublic) {
             boolean validUsername = type == TYPE_GROUPS
                     ? username.matches("[a-z][a-z0-9_]{3,31}")
                     : username.matches("[a-z][a-z0-9_]{0,31}");
@@ -201,8 +242,11 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
         JSONObject payload = new JSONObject();
         try {
             payload.put("title", title);
-            if (username.length() > 0) {
+            if (username.length() > 0 && isPublic) {
                 payload.put("username", username);
+            }
+            if (type == TYPE_CHANNELS) {
+                payload.put("is_public", isPublic);
             }
         } catch (Exception exception) {
             statusView.setText("Не удалось подготовить запрос");
@@ -215,7 +259,57 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
             public void onSuccess(JSONObject response) {
                 primaryInput.setText("");
                 usernameInput.setText("");
-                statusView.setText(type == TYPE_GROUPS ? "Группа создана" : "Канал создан");
+                if (privateChannelCheckBox != null) {
+                    privateChannelCheckBox.setChecked(false);
+                }
+                if (type == TYPE_CHANNELS && !isPublic) {
+                    String inviteLink = response.optString("invite_link", "");
+                    if (inviteLink.length() > 0) {
+                        ClipboardManager clipboard = (ClipboardManager) getParentActivity()
+                                .getSystemService(Context.CLIPBOARD_SERVICE);
+                        if (clipboard != null) {
+                            clipboard.setPrimaryClip(ClipData.newPlainText("WaysGram invite", inviteLink));
+                        }
+                        statusView.setText("Приватный канал создан. Полная ссылка-приглашение скопирована:\n"
+                                + inviteLink);
+                    } else {
+                        statusView.setText("Приватный канал создан, но сервер не вернул ссылку-приглашение.");
+                    }
+                } else {
+                    statusView.setText(type == TYPE_GROUPS ? "Группа создана" : "Публичный канал создан");
+                }
+                loadItems();
+            }
+
+            @Override
+            public void onError(String message, int statusCode) {
+                statusView.setText(message);
+            }
+        });
+    }
+
+    private void joinChannelByInvite() {
+        String inviteValue = inviteInput == null || inviteInput.getText() == null
+                ? ""
+                : inviteInput.getText().toString().trim();
+        if (inviteValue.length() == 0) {
+            statusView.setText("Вставьте ссылку или код приглашения.");
+            return;
+        }
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("invite_link", inviteValue);
+        } catch (Exception exception) {
+            statusView.setText("Не удалось подготовить приглашение.");
+            return;
+        }
+        statusView.setText("Проверяю приглашение…");
+        apiClient.post("/api/channels/join", payload, new WaysGramApiClient.Callback() {
+            @Override
+            public void onSuccess(JSONObject response) {
+                inviteInput.setText("");
+                statusView.setText("Вы вступили в приватный канал: "
+                        + response.optString("title", "Канал"));
                 loadItems();
             }
 
@@ -292,8 +386,12 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
             detail = item.optString("member_count", "0") + " участников";
         } else {
             title = item.optString("title", "Канал " + id);
-            String username = item.optString("username", "");
-            detail = username.length() > 0 ? "@" + username : "";
+            if (item.optBoolean("is_public", true)) {
+                String username = item.optString("username", "");
+                detail = username.length() > 0 ? "@" + username : "Публичный канал";
+            } else {
+                detail = "Приватный канал";
+            }
         }
 
         Button button = new Button(getParentActivity());

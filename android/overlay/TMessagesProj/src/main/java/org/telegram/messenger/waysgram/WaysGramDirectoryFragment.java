@@ -99,6 +99,15 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
 
     private void addDirectoryControls(Context context, LinearLayout root) {
         if (type == TYPE_CONVERSATIONS) {
+            Button savedMessages = new Button(context);
+            savedMessages.setAllCaps(false);
+            savedMessages.setText("Избранное");
+            root.addView(savedMessages, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+            ));
+            savedMessages.setOnClickListener(view -> openSavedMessages());
+
             primaryInput = new EditText(context);
             primaryInput.setSingleLine(true);
             primaryInput.setHint("Поиск по username или имени");
@@ -172,6 +181,30 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
             ));
             join.setOnClickListener(view -> joinChannelByInvite());
         }
+    }
+
+    private void openSavedMessages() {
+        statusView.setText("Открываю Избранное…");
+        apiClient.get("/api/me", new WaysGramApiClient.Callback() {
+            @Override
+            public void onSuccess(JSONObject response) {
+                long userId = response.optLong("id", 0);
+                if (userId <= 0) {
+                    statusView.setText("Не удалось определить аккаунт для Избранного.");
+                    return;
+                }
+                presentFragment(new WaysGramChatFragment(userId, "Избранное"), false);
+            }
+
+            @Override
+            public void onError(String message, int statusCode) {
+                statusView.setText(message);
+                if (statusCode == 401) {
+                    WaysGramSessionStore.getInstance(getParentActivity()).clearSession();
+                    presentFragment(new WaysGramLoginFragment(), true);
+                }
+            }
+        });
     }
 
     private void searchUsers() {

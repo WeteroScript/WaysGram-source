@@ -13,6 +13,20 @@ PATCHER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(PATCHER)
 
 
+class GiftCatalogContractTests(unittest.TestCase):
+    def test_android_requests_the_full_telegram_gift_catalog(self) -> None:
+        client_path = (
+            ROOT
+            / "android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/"
+            / "WaysGramGiftCatalogClient.java"
+        )
+        source = client_path.read_text(encoding="utf-8")
+        self.assertIn(
+            'requestJson(baseUrl + "/api/telegram/gifts?all=1")',
+            source,
+        )
+
+
 class SourcePreservationTests(unittest.TestCase):
     def test_gift_sheet_source_is_unchanged(self) -> None:
         original = "import org.telegram.messenger.UserObject;\nclass GiftSheet {}\n"

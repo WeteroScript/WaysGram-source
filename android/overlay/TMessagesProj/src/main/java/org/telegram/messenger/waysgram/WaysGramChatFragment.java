@@ -336,7 +336,8 @@ public final class WaysGramChatFragment extends BaseFragment {
     private void addMessage(JSONObject message) {
         TextView row = new TextView(getParentActivity());
         long sender = message.optLong("sender_id", 0);
-        String prefix = sender == peerId ? peerTitle + ": " : "Вы: ";
+        long recipient = message.optLong("recipient_id", 0);
+        String prefix = sender == peerId && recipient != peerId ? peerTitle + ": " : "Вы: ";
         row.setText(prefix + message.optString("body", ""));
         row.setTextSize(14);
         row.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));

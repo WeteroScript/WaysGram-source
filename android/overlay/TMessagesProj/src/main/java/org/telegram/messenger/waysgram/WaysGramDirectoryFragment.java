@@ -29,6 +29,7 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
     public static final int TYPE_CONVERSATIONS = 1;
     public static final int TYPE_GROUPS = 2;
     public static final int TYPE_CHANNELS = 3;
+    public static final int TYPE_CONTACTS = 4;
 
     private final int type;
     private WaysGramApiClient apiClient;
@@ -42,6 +43,7 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
     private Button joinInviteButton;
     private boolean createRequestInFlight;
     private boolean joinRequestInFlight;
+    private boolean showingContactSearchResults;
 
     public WaysGramDirectoryFragment(int type) {
         this.type = type;
@@ -49,7 +51,7 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
 
     @Override
     public boolean onFragmentCreate() {
-        return type >= TYPE_CONVERSATIONS && type <= TYPE_CHANNELS;
+        return type >= TYPE_CONVERSATIONS && type <= TYPE_CONTACTS;
     }
 
     @Override
@@ -102,25 +104,29 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
     }
 
     private void addDirectoryControls(Context context, LinearLayout root) {
-        if (type == TYPE_CONVERSATIONS) {
-            Button savedMessages = new Button(context);
-            savedMessages.setAllCaps(false);
-            savedMessages.setText("Избранное");
-            root.addView(savedMessages, new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-            ));
-            savedMessages.setOnClickListener(view -> openSavedMessages());
+        if (type == TYPE_CONVERSATIONS || type == TYPE_CONTACTS) {
+            if (type == TYPE_CONVERSATIONS) {
+                Button savedMessages = new Button(context);
+                savedMessages.setAllCaps(false);
+                savedMessages.setText("Избранное");
+                root.addView(savedMessages, new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                ));
+                savedMessages.setOnClickListener(view -> openSavedMessages());
+            }
 
             primaryInput = new EditText(context);
             primaryInput.setSingleLine(true);
-            primaryInput.setHint("Поиск по username или имени");
+            primaryInput.setHint(type == TYPE_CONTACTS
+                    ? "Найти контакт по username или имени"
+                    : "Поиск по username или имени");
             root.addView(primaryInput, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT
             ));
             Button search = new Button(context);
-            search.setText("Найти пользователя");
+            search.setText(type == TYPE_CONTACTS ? "Найти и добавить контакт" : "Найти пользователя");
             root.addView(search, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT
@@ -213,6 +219,9 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
 
     private void searchUsers() {
         String query = primaryInput.getText() == null ? "" : primaryInput.getText().toString().trim();
+        if (type == TYPE_CONTACTS) {
+            showingContactSearchResults = true;
+        }
         if (query.length() == 0) {
             statusView.setText("Введите username или имя для поиска");
             return;
@@ -389,6 +398,8 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
                 return "Группы";
             case TYPE_CHANNELS:
                 return "Каналы";
+            case TYPE_CONTACTS:
+                return "Контакты";
             default:
                 return "Сообщения";
         }
@@ -403,6 +414,10 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
         } else if (type == TYPE_CHANNELS) {
             path = "/api/channels";
             key = "channels";
+        } else if (type == TYPE_CONTACTS) {
+            path = "/api/contacts";
+            key = "contacts";
+            showingContactSearchResults = false;
         } else {
             path = "/api/conversations";
             key = "conversations";
@@ -459,12 +474,17 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
         String title;
         String detail = "";
         long id = item.optLong("id", 0);
-        if (type == TYPE_CONVERSATIONS) {
+        if (type == TYPE_CONVERSATIONS || type == TYPE_CONTACTS) {
             title = item.optString("display_name", "");
             if (title.length() == 0) {
                 title = item.optString("username", "Пользователь " + id);
             }
-            detail = item.optString("last_message", "");
+            if (type == TYPE_CONTACTS) {
+                String username = item.optString("username", "");
+                detail = username.isEmpty() ? "" : "@" + username;
+            } else {
+                detail = item.optString("last_message", "");
+            }
         } else if (type == TYPE_GROUPS) {
             title = item.optString("title", "Группа " + id);
             detail = item.optString("member_count", "0") + " участников";
@@ -476,6 +496,43 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
             } else {
                 detail = "Приватный канал";
             }
+        }
+
+        if (type == TYPE_CONTACTS) {
+            LinearLayout row = new LinearLayout(getParentActivity());
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            Button open = new Button(getParentActivity());
+            open.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+            open.setAllCaps(false);
+            open.setText(detail.length() > 0 ? title + "\n" + detail : title);
+            row.addView(open, new LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1
+            ));
+            Button manage = new Button(getParentActivity());
+            manage.setAllCaps(false);
+            manage.setText(showingContactSearchResults ? "Добавить" : "Удалить");
+            row.addView(manage, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ));
+            LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+            );
+            rowParams.topMargin = AndroidUtilities.dp(5);
+            listContainer.addView(row, rowParams);
+            final String selectedTitle = title;
+            open.setOnClickListener(view -> {
+                if (id > 0) {
+                    presentFragment(new WaysGramChatFragment(id, selectedTitle), false);
+                }
+            });
+            if (showingContactSearchResults) {
+                manage.setOnClickListener(view -> addContact(id, manage));
+            } else {
+                manage.setOnClickListener(view -> removeContact(id));
+            }
+            return;
         }
 
         Button button = new Button(getParentActivity());
@@ -501,6 +558,53 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
                         id,
                         selectedTitle
                 ), false);
+            }
+        });
+    }
+
+    private void addContact(long userId, Button button) {
+        if (userId <= 0 || button == null || !button.isEnabled()) {
+            return;
+        }
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("user_id", userId);
+        } catch (Exception exception) {
+            statusView.setText("Не удалось подготовить контакт");
+            return;
+        }
+        button.setEnabled(false);
+        button.setText("Добавляю…");
+        apiClient.post("/api/contacts", payload, new WaysGramApiClient.Callback() {
+            @Override
+            public void onSuccess(JSONObject response) {
+                button.setText("Добавлен");
+                statusView.setText("Контакт добавлен");
+            }
+
+            @Override
+            public void onError(String message, int statusCode) {
+                button.setEnabled(true);
+                button.setText("Добавить");
+                statusView.setText(message);
+            }
+        });
+    }
+
+    private void removeContact(long userId) {
+        if (userId <= 0) {
+            return;
+        }
+        apiClient.delete("/api/contacts/" + userId, new WaysGramApiClient.Callback() {
+            @Override
+            public void onSuccess(JSONObject response) {
+                statusView.setText("Контакт удалён");
+                loadItems();
+            }
+
+            @Override
+            public void onError(String message, int statusCode) {
+                statusView.setText(message);
             }
         });
     }

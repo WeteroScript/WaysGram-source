@@ -399,7 +399,9 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
                 inviteInput.setText("");
                 statusView.setText(response.optBoolean("already_member", false)
                         ? "Вы уже состоите в группе: " + response.optString("title", "Группа")
-                        : "Вы вступили в группу: " + response.optString("title", "Группа"));
+                        : response.optBoolean("join_requested", false)
+                            ? "Заявка на вступление отправлена. Ожидайте одобрения администратора."
+                            : "Вы вступили в группу: " + response.optString("title", "Группа"));
                 loadItems();
             }
 

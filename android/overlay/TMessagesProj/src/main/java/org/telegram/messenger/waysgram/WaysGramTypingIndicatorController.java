@@ -62,7 +62,7 @@ public final class WaysGramTypingIndicatorController {
 
             @Override
             public void afterTextChanged(Editable value) {
-                if (closed) {
+                if (closed || !input.hasFocus()) {
                     return;
                 }
                 if (value == null || value.toString().trim().isEmpty()) {

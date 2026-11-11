@@ -1320,6 +1320,17 @@ public final class WaysGramTimelineFragment extends BaseFragment {
         if (!reactionSummary.isEmpty()) {
             body += "\n" + reactionSummary.replace(",", " · ").replace(":", " ");
         }
+        JSONArray myReactions = message.optJSONArray("my_reactions");
+        if (myReactions != null && myReactions.length() > 0) {
+            StringBuilder mine = new StringBuilder("\nВаша реакция: ");
+            for (int i = 0; i < myReactions.length(); i++) {
+                if (i > 0) {
+                    mine.append(" · ");
+                }
+                mine.append(myReactions.optString(i));
+            }
+            body += mine.toString();
+        }
         row.setText(body);
         row.setContentDescription("Удерживайте сообщение, чтобы ответить или поставить реакцию");
         if (messageId > 0) {

@@ -2,6 +2,8 @@ package org.telegram.messenger.waysgram;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
@@ -540,8 +542,12 @@ public final class WaysGramChatFragment extends BaseFragment {
                         : "Отправлено");
             }
         }
+        String reactionSummary = message.optString("reaction_summary", "");
+        if (!reactionSummary.isEmpty()) {
+            displayText += "\n" + reactionSummary.replace(",", " · ").replace(":", " ");
+        }
         row.setText(displayText);
-        row.setContentDescription("Удерживайте сообщение, чтобы ответить");
+        row.setContentDescription("Удерживайте сообщение, чтобы ответить или поставить реакцию");
         if (messageId > 0) {
             row.setOnLongClickListener(view -> {
                 showMessageActions(message);
@@ -600,20 +606,77 @@ public final class WaysGramChatFragment extends BaseFragment {
         if (messageId <= 0) {
             return;
         }
-        String[] actions = {"Ответить", "Редактировать", "Удалить", "Переслать"};
+        String[] actions = {"Ответить", "Реакция", "Копировать", "Редактировать", "Удалить", "Переслать"};
         new AlertDialog.Builder(getParentActivity())
                 .setItems(actions, (dialog, which) -> {
                     if (which == 0) {
                         setReplyTarget(messageId);
                     } else if (which == 1) {
-                        editMessage(messageId, message.optString("body", ""));
+                        showReactionPicker(messageId);
                     } else if (which == 2) {
-                        confirmDeleteMessage(messageId);
+                        copyMessageText(message.optString("body", ""));
                     } else if (which == 3) {
+                        editMessage(messageId, message.optString("body", ""));
+                    } else if (which == 4) {
+                        confirmDeleteMessage(messageId);
+                    } else if (which == 5) {
                         chooseForwardRecipient(messageId);
                     }
                 })
                 .show();
+    }
+
+    private void copyMessageText(String body) {
+        if (body == null || body.isEmpty()) {
+            statusView.setText("В сообщении нет текста для копирования");
+            return;
+        }
+        ClipboardManager clipboard = (ClipboardManager) getParentActivity()
+                .getSystemService(Context.CLIPBOARD_SERVICE);
+        if (clipboard == null) {
+            statusView.setText("Буфер обмена недоступен");
+            return;
+        }
+        clipboard.setPrimaryClip(ClipData.newPlainText("WaysGram message", body));
+        statusView.setText("Текст сообщения скопирован");
+    }
+
+    private void showReactionPicker(long messageId) {
+        String[] reactions = {"👍", "❤️", "😂", "😮", "😢", "🎉", "🙏"};
+        new AlertDialog.Builder(getParentActivity())
+                .setTitle("Выберите реакцию")
+                .setItems(reactions, (dialog, which) -> {
+                    if (which >= 0 && which < reactions.length) {
+                        sendReaction("/api/messages/" + messageId + "/reactions", reactions[which]);
+                    }
+                })
+                .setNegativeButton("Отмена", null)
+                .show();
+    }
+
+    private void sendReaction(String path, String reaction) {
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("reaction", reaction);
+        } catch (Exception exception) {
+            statusView.setText("Не удалось подготовить реакцию");
+            return;
+        }
+        statusView.setText("Сохраняю реакцию…");
+        apiClient.post(path, payload, new WaysGramApiClient.Callback() {
+            @Override
+            public void onSuccess(JSONObject response) {
+                statusView.setText("Реакция " + (response.optString("status").equals("removed")
+                        ? "удалена"
+                        : "добавлена"));
+                loadMessages();
+            }
+
+            @Override
+            public void onError(String message, int statusCode) {
+                statusView.setText(message);
+            }
+        });
     }
 
     private void chooseForwardRecipient(long messageId) {

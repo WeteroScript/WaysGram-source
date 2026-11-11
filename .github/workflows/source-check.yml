@@ -120,3 +120,7 @@ jobs:
           grep -q 'peerReadMessageId' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramChatFragment.java
           grep -q 'DateFormat.getTimeInstance' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramChatFragment.java
           test -s tests/test_android_build_config.py
+          grep -q 'Редактировать профиль' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramHomeFragment.java
+          grep -q 'apiClient.put("/api/me"' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramHomeFragment.java
+          grep -q 'apiClient.put("/api/me/avatar"' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramHomeFragment.java
+          grep -q 'REQUEST_AVATAR' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramHomeFragment.java

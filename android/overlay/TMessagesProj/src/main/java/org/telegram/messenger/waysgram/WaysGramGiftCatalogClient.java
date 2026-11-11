@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -149,6 +150,7 @@ public final class WaysGramGiftCatalogClient implements AutoCloseable {
 
     private final SessionProvider sessionProvider;
     private final ExecutorService ioExecutor;
+    private final ConcurrentHashMap<String, String> purchaseIdempotencyKeys = new ConcurrentHashMap<>();
 
     public WaysGramGiftCatalogClient(SessionProvider sessionProvider) {
         if (sessionProvider == null) {
@@ -211,12 +213,17 @@ public final class WaysGramGiftCatalogClient implements AutoCloseable {
             try {
                 String encodedGiftId = URLEncoder.encode(gift.id, "UTF-8").replace("+", "%20");
                 JSONObject payload = new JSONObject();
+                String idempotencyKey = purchaseIdempotencyKeys.computeIfAbsent(
+                        gift.id,
+                        ignored -> "wg-" + UUID.randomUUID().toString()
+                );
                 JSONObject response = requestJson(
                         getBaseUrl() + "/api/telegram/gifts/" + encodedGiftId + "/purchase",
                         "POST",
                         payload.toString(),
-                        "wg-" + UUID.randomUUID().toString()
+                        idempotencyKey
                 );
+                purchaseIdempotencyKeys.remove(gift.id, idempotencyKey);
                 callback.onPurchased(response);
             } catch (Exception exception) {
                 callback.onError(toSafeError(exception));
@@ -386,6 +393,7 @@ public final class WaysGramGiftCatalogClient implements AutoCloseable {
     @Override
     public void close() {
         ioExecutor.shutdownNow();
+        purchaseIdempotencyKeys.clear();
     }
 
     private static final class HttpStatusException extends IOException {

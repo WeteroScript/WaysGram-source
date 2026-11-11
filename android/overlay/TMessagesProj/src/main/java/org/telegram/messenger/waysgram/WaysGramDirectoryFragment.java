@@ -4,6 +4,8 @@ import android.app.AlertDialog;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.InputFilter;
 import android.view.Gravity;
 import android.view.View;
@@ -48,6 +50,18 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
     private boolean joinRequestInFlight;
     private boolean showingContactSearchResults;
     private boolean showingBlockSearchResults;
+    private boolean isScreenResumed;
+    private boolean directoryEventsReady;
+    private boolean directoryEventsInitializing;
+    private boolean directoryEventPollInFlight;
+    private long lastDirectoryEventId;
+    private final Handler directoryEventHandler = new Handler(Looper.getMainLooper());
+    private final Runnable directoryEventRetryRunnable = new Runnable() {
+        @Override
+        public void run() {
+            checkDirectoryEvents();
+        }
+    };
 
     public WaysGramDirectoryFragment(int type) {
         this.type = type;
@@ -105,6 +119,124 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
         fragmentView = root;
         loadItems();
         return root;
+    }
+
+    private boolean supportsDirectoryEvents() {
+        return type == TYPE_CONVERSATIONS || type == TYPE_GROUPS || type == TYPE_CHANNELS;
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        isScreenResumed = true;
+        if (supportsDirectoryEvents()) {
+            directoryEventHandler.removeCallbacks(directoryEventRetryRunnable);
+            initializeDirectoryEventCursor();
+        }
+    }
+
+    @Override
+    public void onPause() {
+        isScreenResumed = false;
+        directoryEventHandler.removeCallbacks(directoryEventRetryRunnable);
+        super.onPause();
+    }
+
+    private void initializeDirectoryEventCursor() {
+        if (apiClient == null || !isScreenResumed || !supportsDirectoryEvents()
+                || directoryEventsReady || directoryEventsInitializing) {
+            return;
+        }
+        directoryEventsInitializing = true;
+        apiClient.get("/api/events", new WaysGramApiClient.Callback() {
+            @Override
+            public void onSuccess(JSONObject response) {
+                directoryEventsInitializing = false;
+                if (!isScreenResumed) {
+                    return;
+                }
+                lastDirectoryEventId = response.optLong("latest_id", 0);
+                directoryEventsReady = true;
+                // Re-read after obtaining the cursor so no message can fall between
+                // the initial list request and event subscription.
+                loadItems();
+                checkDirectoryEvents();
+            }
+
+            @Override
+            public void onError(String message, int statusCode) {
+                directoryEventsInitializing = false;
+                if (statusCode == 401) {
+                    WaysGramSessionStore.getInstance(getParentActivity()).clearSession();
+                    presentFragment(new WaysGramLoginFragment(), true);
+                } else {
+                    scheduleDirectoryEventRetry(4000);
+                }
+            }
+        });
+    }
+
+    private void scheduleDirectoryEventRetry(int delayMs) {
+        if (apiClient != null && isScreenResumed && supportsDirectoryEvents()) {
+            directoryEventHandler.removeCallbacks(directoryEventRetryRunnable);
+            directoryEventHandler.postDelayed(directoryEventRetryRunnable, delayMs);
+        }
+    }
+
+    private void checkDirectoryEvents() {
+        if (apiClient == null || !isScreenResumed || !supportsDirectoryEvents()
+                || directoryEventPollInFlight) {
+            return;
+        }
+        if (!directoryEventsReady) {
+            initializeDirectoryEventCursor();
+            return;
+        }
+        directoryEventPollInFlight = true;
+        apiClient.getEventLongPoll(
+                "/api/events?after_id=" + lastDirectoryEventId + "&wait_seconds=20",
+                new WaysGramApiClient.Callback() {
+                    @Override
+                    public void onSuccess(JSONObject response) {
+                        directoryEventPollInFlight = false;
+                        if (!isScreenResumed) {
+                            return;
+                        }
+                        JSONArray events = response.optJSONArray("events");
+                        String expectedScope = type == TYPE_CONVERSATIONS
+                                ? "dm" : type == TYPE_GROUPS ? "group" : "channel";
+                        boolean refreshDirectory = false;
+                        int count = events == null ? 0 : events.length();
+                        for (int i = 0; i < count; i++) {
+                            JSONObject event = events.optJSONObject(i);
+                            if (event != null && expectedScope.equals(event.optString("scope"))
+                                    && "new_message".equals(event.optString("kind"))) {
+                                refreshDirectory = true;
+                                break;
+                            }
+                        }
+                        lastDirectoryEventId = Math.max(
+                                lastDirectoryEventId,
+                                response.optLong("latest_id", lastDirectoryEventId)
+                        );
+                        if (refreshDirectory) {
+                            loadItems();
+                        }
+                        checkDirectoryEvents();
+                    }
+
+                    @Override
+                    public void onError(String message, int statusCode) {
+                        directoryEventPollInFlight = false;
+                        if (statusCode == 401) {
+                            WaysGramSessionStore.getInstance(getParentActivity()).clearSession();
+                            presentFragment(new WaysGramLoginFragment(), true);
+                        } else {
+                            scheduleDirectoryEventRetry(4000);
+                        }
+                    }
+                }
+        );
     }
 
     private void addDirectoryControls(Context context, LinearLayout root) {
@@ -558,10 +690,19 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
                 }
             } else {
                 detail = item.optString("last_message", "");
+                int unreadCount = item.optInt("unread_count", 0);
+                if (unreadCount > 0) {
+                    detail += (detail.isEmpty() ? "" : "\\n")
+                            + "Непрочитано: " + unreadCount;
+                }
             }
         } else if (type == TYPE_GROUPS) {
             title = item.optString("title", "Группа " + id);
             detail = item.optString("member_count", "0") + " участников";
+            int unreadCount = item.optInt("unread_count", 0);
+            if (unreadCount > 0) {
+                detail += "\\nНепрочитано: " + unreadCount;
+            }
         } else {
             title = item.optString("title", "Канал " + id);
             if (isPublicChannel(item)) {
@@ -569,6 +710,10 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
                 detail = username.length() > 0 ? "@" + username : "Публичный канал";
             } else {
                 detail = "Приватный канал";
+            }
+            int unreadCount = item.optInt("unread_count", 0);
+            if (unreadCount > 0) {
+                detail += "\\nНепрочитано: " + unreadCount;
             }
         }
 
@@ -823,6 +968,8 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
 
     @Override
     public void onFragmentDestroy() {
+        isScreenResumed = false;
+        directoryEventHandler.removeCallbacks(directoryEventRetryRunnable);
         if (apiClient != null) {
             apiClient.close();
             apiClient = null;

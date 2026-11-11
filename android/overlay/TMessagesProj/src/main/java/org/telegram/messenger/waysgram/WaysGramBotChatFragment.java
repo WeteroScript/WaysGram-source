@@ -178,7 +178,7 @@ public final class WaysGramBotChatFragment extends BaseFragment {
             return;
         }
         pollInFlight = true;
-        apiClient.get(messagesPath() + "?after_id=" + lastMessageId + "&wait_seconds=20", new WaysGramApiClient.Callback() {
+        apiClient.getLongPoll(messagesPath() + "?after_id=" + lastMessageId + "&wait_seconds=20", new WaysGramApiClient.Callback() {
             @Override
             public void onSuccess(JSONObject response) {
                 pollInFlight = false;

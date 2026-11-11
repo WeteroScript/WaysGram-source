@@ -76,7 +76,7 @@ public final class WaysGramGiftCatalogSheet extends BottomSheet {
         catalogClient = new WaysGramGiftCatalogClient(sessionProvider);
         adapter = new GiftAdapter();
 
-        setTitle("Подарки Telegram", true);
+        setTitle("Подарки WaysGram", true);
         setApplyTopPadding(false);
         setApplyBottomPadding(true);
         setCustomView(createContent(context));
@@ -102,7 +102,7 @@ public final class WaysGramGiftCatalogSheet extends BottomSheet {
         );
 
         TextView subtitle = new TextView(context);
-        subtitle.setText("Магазин WaysGram · цены указаны в WaysGram Stars");
+        subtitle.setText("Внутренний каталог WaysGram · Telegram Gift ID используется только как источник данных");
         subtitle.setTextSize(13);
         subtitle.setTextColor(Theme.getColor(Theme.key_dialogTextGray2, resourcesProvider));
         subtitle.setPadding(AndroidUtilities.dp(2), 0, AndroidUtilities.dp(2), AndroidUtilities.dp(10));

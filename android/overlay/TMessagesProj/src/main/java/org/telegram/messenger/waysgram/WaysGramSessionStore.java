@@ -34,10 +34,12 @@ public final class WaysGramSessionStore implements WaysGramGiftCatalogClient.Ses
     private final SharedPreferences preferences;
 
     private WaysGramSessionStore(Context context) {
-        preferences = context.getApplicationContext().getSharedPreferences(
+        Context applicationContext = context.getApplicationContext();
+        preferences = applicationContext.getSharedPreferences(
                 PREFS_NAME,
                 Context.MODE_PRIVATE
         );
+        WaysGramTelemetry.initialize(applicationContext);
     }
 
     public static WaysGramSessionStore getInstance(Context context) {

@@ -404,6 +404,27 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
         });
     }
 
+    private static boolean isPublicChannel(JSONObject item) {
+        Object value = item.opt("is_public");
+        if (value instanceof Boolean) {
+            return (Boolean) value;
+        }
+        if (value instanceof Number) {
+            return ((Number) value).intValue() != 0;
+        }
+        if (value instanceof String) {
+            String flag = ((String) value).trim();
+            if ("0".equals(flag) || "false".equalsIgnoreCase(flag)) {
+                return false;
+            }
+            if ("1".equals(flag) || "true".equalsIgnoreCase(flag)) {
+                return true;
+            }
+        }
+        // Older API versions had no is_public field and exposed only public channels.
+        return value == null;
+    }
+
     private void addItem(JSONObject item) {
         String title;
         String detail = "";
@@ -419,7 +440,7 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
             detail = item.optString("member_count", "0") + " участников";
         } else {
             title = item.optString("title", "Канал " + id);
-            if (item.optBoolean("is_public", true)) {
+            if (isPublicChannel(item)) {
                 String username = item.optString("username", "");
                 detail = username.length() > 0 ? "@" + username : "Публичный канал";
             } else {

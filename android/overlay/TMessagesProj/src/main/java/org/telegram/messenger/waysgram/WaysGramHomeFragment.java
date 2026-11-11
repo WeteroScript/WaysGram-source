@@ -421,15 +421,15 @@ public final class WaysGramHomeFragment extends BaseFragment {
                     StringBuilder label = new StringBuilder();
                     label.append(current[i] ? "Текущий сеанс" : "Другой сеанс");
                     if (created > 0) {
-                        label.append("\\nСоздан: ").append(formatSessionDate(created));
+                        label.append("\nСоздан: ").append(formatSessionDate(created));
                     }
                     if (expires > 0) {
-                        label.append("\\nИстекает: ").append(formatSessionDate(expires));
+                        label.append("\nИстекает: ").append(formatSessionDate(expires));
                     }
                     if (current[i]) {
-                        label.append("\\nЭтот вход используется сейчас");
+                        label.append("\nЭтот вход используется сейчас");
                     } else {
-                        label.append("\\nНажмите, чтобы завершить");
+                        label.append("\nНажмите, чтобы завершить");
                     }
                     labels[i] = label.toString();
                 }

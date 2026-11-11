@@ -11,8 +11,6 @@ import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.InputType;
-import android.text.Editable;
-import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -41,6 +39,7 @@ public final class WaysGramTimelineFragment extends BaseFragment {
     private final String targetTitle;
 
     private WaysGramApiClient apiClient;
+    private WaysGramCloudDraftSync cloudDraftSync;
     private LinearLayout messagesContainer;
     private LinearLayout managementList;
     private EditText messageInput;
@@ -129,21 +128,10 @@ public final class WaysGramTimelineFragment extends BaseFragment {
         messageInput.setHint(type == TYPE_GROUP ? "Сообщение в группу" : "Публикация или подпись к вложению");
         String draftScope = type == TYPE_GROUP ? "group" : "channel";
         messageInput.setText(WaysGramDraftStore.load(context, draftScope, targetId));
-        messageInput.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence value, int start, int count, int after) {
-            }
-
-            @Override
-            public void onTextChanged(CharSequence value, int start, int before, int count) {
-            }
-
-            @Override
-            public void afterTextChanged(Editable value) {
-                WaysGramDraftStore.save(getParentActivity(), draftScope, targetId,
-                        value == null ? "" : value.toString());
-            }
-        });
+        cloudDraftSync = new WaysGramCloudDraftSync(
+                context, apiClient, draftScope, targetId, messageInput
+        );
+        cloudDraftSync.start();
         attachButton = new Button(context);
         attachButton.setText("Файл");
         attachButton.setAllCaps(false);
@@ -376,7 +364,7 @@ public final class WaysGramTimelineFragment extends BaseFragment {
         apiClient.post(basePath(), payload, new WaysGramApiClient.Callback() {
             @Override
             public void onSuccess(JSONObject response) {
-                messageInput.setText("");
+                clearTimelineDraft();
                 setSendInFlight(false);
                 statusView.setText(type == TYPE_GROUP ? "Изображение отправлено." : "Изображение опубликовано.");
                 loadMessages();
@@ -1250,7 +1238,7 @@ public final class WaysGramTimelineFragment extends BaseFragment {
         apiClient.post(basePath(), payload, new WaysGramApiClient.Callback() {
             @Override
             public void onSuccess(JSONObject response) {
-                messageInput.setText("");
+                clearTimelineDraft();
                 setSendInFlight(false);
                 statusView.setText(type == TYPE_GROUP ? "Документ отправлен." : "Документ опубликован.");
                 loadMessages();
@@ -1266,6 +1254,14 @@ public final class WaysGramTimelineFragment extends BaseFragment {
                 }
             }
         });
+    }
+
+    private void clearTimelineDraft() {
+        if (cloudDraftSync != null) {
+            cloudDraftSync.clear();
+        } else if (messageInput != null) {
+            messageInput.setText("");
+        }
     }
 
     private void sendMessage() {
@@ -1292,7 +1288,7 @@ public final class WaysGramTimelineFragment extends BaseFragment {
         apiClient.post(basePath(), payload, new WaysGramApiClient.Callback() {
             @Override
             public void onSuccess(JSONObject response) {
-                messageInput.setText("");
+                clearTimelineDraft();
                 replyToMessageId = 0;
                 statusView.setOnClickListener(null);
                 setSendInFlight(false);
@@ -1324,6 +1320,9 @@ public final class WaysGramTimelineFragment extends BaseFragment {
     public void onPause() {
         isScreenResumed = false;
         pollHandler.removeCallbacks(pollRunnable);
+        if (cloudDraftSync != null) {
+            cloudDraftSync.flush();
+        }
         super.onPause();
     }
 
@@ -1331,6 +1330,10 @@ public final class WaysGramTimelineFragment extends BaseFragment {
     public void onFragmentDestroy() {
         isScreenResumed = false;
         pollHandler.removeCallbacks(pollRunnable);
+        if (cloudDraftSync != null) {
+            cloudDraftSync.close();
+            cloudDraftSync = null;
+        }
         if (apiClient != null) {
             apiClient.close();
             apiClient = null;

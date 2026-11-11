@@ -73,6 +73,7 @@ public final class WaysGramApiClient implements AutoCloseable {
     private final WaysGramSessionStore sessionStore;
     private final ExecutorService ioExecutor;
     private final ExecutorService longPollExecutor;
+    private final ExecutorService eventPollExecutor;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     public WaysGramApiClient(WaysGramSessionStore sessionStore) {
@@ -87,6 +88,11 @@ public final class WaysGramApiClient implements AutoCloseable {
         });
         longPollExecutor = Executors.newSingleThreadExecutor(runnable -> {
             Thread thread = new Thread(runnable, "WaysGramLongPoll");
+            thread.setDaemon(true);
+            return thread;
+        });
+        eventPollExecutor = Executors.newSingleThreadExecutor(runnable -> {
+            Thread thread = new Thread(runnable, "WaysGramEventPoll");
             thread.setDaemon(true);
             return thread;
         });
@@ -109,6 +115,22 @@ public final class WaysGramApiClient implements AutoCloseable {
                 deliverError(callback, exception.getMessage(), exception.statusCode);
             } catch (Exception exception) {
                 deliverError(callback, "Не удалось получить обновления WaysGram", 0);
+            }
+        });
+    }
+
+    /**
+     * Keeps message-change events waiting independently from the message long poll.
+     */
+    public void getEventLongPoll(String path, Callback callback) {
+        eventPollExecutor.execute(() -> {
+            try {
+                JSONObject response = request("GET", path, null);
+                deliverSuccess(callback, response);
+            } catch (ApiException exception) {
+                deliverError(callback, exception.getMessage(), exception.statusCode);
+            } catch (Exception exception) {
+                deliverError(callback, "Не удалось получить события WaysGram", 0);
             }
         });
     }
@@ -592,6 +614,7 @@ public final class WaysGramApiClient implements AutoCloseable {
     public void close() {
         ioExecutor.shutdown();
         longPollExecutor.shutdown();
+        eventPollExecutor.shutdown();
     }
 
     private static final class ApiException extends IOException {

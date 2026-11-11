@@ -115,6 +115,67 @@ def patch_settings_source(original: str) -> str:
     return updated
 
 
+def patch_push_service_source(original: str) -> str:
+    """Route WaysGram FCM messages separately and refresh its secondary token."""
+    message_marker = "WaysGramPushNotifications.show(this, message);"
+    token_marker = "WaysGramPushManager.sync(this);"
+    if message_marker in original and token_marker in original:
+        return original
+    if message_marker in original or token_marker in original:
+        raise ValueError("GcmPushListenerService contains a partial WaysGram push patch")
+
+    updated = replace_exactly_once(
+        original,
+        "package org.telegram.messenger;\n",
+        "package org.telegram.messenger;\n\n"
+        "import org.telegram.messenger.waysgram.WaysGramPushManager;\n"
+        "import org.telegram.messenger.waysgram.WaysGramPushNotifications;\n",
+        "FCM service WaysGram imports",
+    )
+    updated = replace_exactly_once(
+        updated,
+        "        PushListenerController.processRemoteMessage("
+        "PushListenerController.PUSH_TYPE_FIREBASE, data.get(\"p\"), time);\n",
+        "        if (\"1\".equals(data.get(\"waysgram\"))) {\n"
+        "            WaysGramPushNotifications.show(this, message);\n"
+        "            return;\n"
+        "        }\n"
+        "        PushListenerController.processRemoteMessage("
+        "PushListenerController.PUSH_TYPE_FIREBASE, data.get(\"p\"), time);\n",
+        "FCM message routing",
+    )
+    updated = replace_exactly_once(
+        updated,
+        "            PushListenerController.sendRegistrationToServer("
+        "PushListenerController.PUSH_TYPE_FIREBASE, token);\n",
+        "            PushListenerController.sendRegistrationToServer("
+        "PushListenerController.PUSH_TYPE_FIREBASE, token);\n"
+        "            WaysGramPushManager.sync(this);\n",
+        "FCM secondary token refresh",
+    )
+    return updated
+
+
+def patch_notification_permissions(android_root: Path) -> None:
+    """Declare Android 13+ notification permission in both app manifests."""
+    anchor = '    <uses-permission android:name="com.google.android.c2dm.permission.RECEIVE" />\n'
+    permission = '    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n'
+    for variant in ("debug", "release"):
+        manifest = android_root / f"TMessagesProj/config/{variant}/AndroidManifest.xml"
+        if not manifest.is_file():
+            raise FileNotFoundError(f"Required {variant} manifest not found: {manifest}")
+        content = manifest.read_text(encoding="utf-8")
+        if permission in content:
+            continue
+        updated = replace_exactly_once(
+            content,
+            anchor,
+            anchor + permission,
+            f"{variant} notification permission",
+        )
+        manifest.write_text(updated, encoding="utf-8")
+
+
 def verify_source(android_root: Path) -> None:
     gift_sheet = android_root / "TMessagesProj/src/main/java/org/telegram/ui/Gifts/GiftSheet.java"
     launch_activity = android_root / "TMessagesProj/src/main/java/org/telegram/ui/LaunchActivity.java"
@@ -144,9 +205,24 @@ def verify_source(android_root: Path) -> None:
     if patched_settings != settings_content:
         settings_activity.write_text(patched_settings, encoding="utf-8")
 
+    push_service = android_root / "TMessagesProj/src/main/java/org/telegram/messenger/GcmPushListenerService.java"
+    if not push_service.is_file():
+        raise FileNotFoundError(f"Required Firebase messaging service not found: {push_service}")
+    push_source = push_service.read_text(encoding="utf-8")
+    patched_push_source = patch_push_service_source(push_source)
+    if patched_push_source != push_source:
+        push_service.write_text(patched_push_source, encoding="utf-8")
+    patch_notification_permissions(android_root)
+
     final_settings = settings_activity.read_text(encoding="utf-8")
     if WAYS_GRAM_SETTINGS_ROW not in final_settings or "presentSettingFragment(new WaysGramHomeFragment())" not in final_settings:
         raise ValueError("WaysGram Settings entry is missing after patching")
+    final_push_source = push_service.read_text(encoding="utf-8")
+    if (
+        "WaysGramPushNotifications.show(this, message);" not in final_push_source
+        or "WaysGramPushManager.sync(this);" not in final_push_source
+    ):
+        raise ValueError("WaysGram FCM routing is missing after patching")
 
 
 def main() -> None:

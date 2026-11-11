@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import json
+import os
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from scripts.prepare_android_dev_build import configure_android_root
@@ -49,6 +52,56 @@ class AndroidDevBuildConfigurationTests(unittest.TestCase):
             strings = (root / "TMessagesProj/src/main/res/values/strings.xml").read_text(encoding="utf-8")
             self.assertIn('<string name="AppName">WaysGram</string>', strings)
             self.assertIn('<string name="AppNameBeta">WaysGram Dev</string>', strings)
+
+    def test_generates_waysgram_secondary_firebase_options(self) -> None:
+        firebase_config = {
+            "project_info": {
+                "project_number": "123456789012",
+                "project_id": "waysgram-59956",
+            },
+            "client": [{
+                "client_info": {
+                    "mobilesdk_app_id": "1:123456789012:android:abcdef012345",
+                    "android_client_info": {"package_name": "org.waysgram.messenger"},
+                },
+                "api_key": [{"current_key": "AIzaExamplePublicClientKey"}],
+            }],
+        }
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.make_project(root)
+            with patch.dict(os.environ, {
+                "WAYSGRAM_FIREBASE_CONFIG_JSON": json.dumps(firebase_config),
+            }, clear=False):
+                self.assertTrue(PREPARE.configure_waysgram_firebase(root))
+            generated = (
+                root / "TMessagesProj/src/main/java/org/telegram/messenger/waysgram/"
+                "WaysGramFirebaseConfig.java"
+            ).read_text(encoding="utf-8")
+            self.assertIn('PROJECT_ID = "waysgram-59956"', generated)
+            self.assertIn('SENDER_ID = "123456789012"', generated)
+            self.assertIn('APP_ID = "1:123456789012:android:abcdef012345"', generated)
+
+    def test_firebase_config_rejects_wrong_registered_android_package(self) -> None:
+        firebase_config = {
+            "project_info": {
+                "project_number": "123456789012",
+                "project_id": "waysgram-59956",
+            },
+            "client": [{
+                "client_info": {
+                    "mobilesdk_app_id": "1:123456789012:android:abcdef012345",
+                    "android_client_info": {"package_name": "org.telegram.messenger"},
+                },
+                "api_key": [{"current_key": "AIzaExamplePublicClientKey"}],
+            }],
+        }
+        with tempfile.TemporaryDirectory() as temp:
+            with patch.dict(os.environ, {
+                "WAYSGRAM_FIREBASE_CONFIG_JSON": json.dumps(firebase_config),
+            }, clear=False):
+                with self.assertRaises(ValueError):
+                    PREPARE.configure_waysgram_firebase(Path(temp))
 
     def test_is_idempotent(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

@@ -370,6 +370,7 @@ public final class WaysGramTimelineFragment extends BaseFragment {
                 }
                 lastMessageId = newestId;
                 statusView.setText(count == 0 ? "Сообщений пока нет" : "Сообщений: " + count);
+                markMessagesRead();
                 scheduleNextPoll();
             }
 
@@ -381,6 +382,34 @@ public final class WaysGramTimelineFragment extends BaseFragment {
                     presentFragment(new WaysGramLoginFragment(), true);
                 } else {
                     scheduleNextPoll();
+                }
+            }
+        });
+    }
+
+    private void markMessagesRead() {
+        if (apiClient == null || lastMessageId <= 0) {
+            return;
+        }
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("scope", type == TYPE_GROUP ? "group" : "channel");
+            payload.put("peer_id", targetId);
+            payload.put("last_read_id", lastMessageId);
+        } catch (Exception exception) {
+            return;
+        }
+        apiClient.put("/api/read", payload, new WaysGramApiClient.Callback() {
+            @Override
+            public void onSuccess(JSONObject response) {
+                // Read markers are background state; keep the timeline status unchanged.
+            }
+
+            @Override
+            public void onError(String message, int statusCode) {
+                if (statusCode == 401 && getParentActivity() != null) {
+                    WaysGramSessionStore.getInstance(getParentActivity()).clearSession();
+                    presentFragment(new WaysGramLoginFragment(), true);
                 }
             }
         });
@@ -420,6 +449,7 @@ public final class WaysGramTimelineFragment extends BaseFragment {
                 }
                 if (count > 0) {
                     statusView.setText("Новые сообщения: " + count);
+                    markMessagesRead();
                 }
                 scheduleNextPoll();
             }

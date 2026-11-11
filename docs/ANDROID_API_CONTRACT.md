@@ -42,7 +42,8 @@ Authorization: Bearer <waysgram-session-token>
 
 The current Android overlay calls these API areas:
 
-- Profile and wallet: `GET /api/me`, `GET /api/me/wallet`.
+- Profile and wallet: `GET /api/me`, `PUT /api/me`, `GET /api/me/wallet`.
+- Profile avatar: `POST /api/media/images`, `PUT /api/me/avatar`, and `DELETE /api/me/avatar`.
 - User lookup: `GET /api/users?q=...`.
 - Contacts: `GET /api/contacts`, `POST /api/contacts`, and `DELETE /api/contacts/{user_id}`. Contacts are added manually from user search; phone-book synchronization is not implemented.
 - Personal messages: `GET /api/messages` and `POST /api/messages`.
@@ -58,7 +59,7 @@ The current Android overlay calls these API areas:
 - Document upload: `POST /api/media/documents` for PDF, TXT, and CSV.
 - Authenticated attachment download: `GET /api/media/{media_id}`.
 
-Direct messages support text, conversation-scoped message search, static image, and PDF/TXT/CSV attachments. Group/channel timelines support text, static image and PDF/TXT/CSV attachments. Message history and send responses expose `media_id`, `media_type`, and `media_name` for attachments. Images render inline; documents are saved through Android's system document picker. The backend returns documents with `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff`.
+The profile screen supports editing display name, username and bio, viewing the current avatar, and uploading/removing the avatar image. Username uniqueness and field validation are enforced by AuthBot. Direct messages support text, conversation-scoped message search, static image, and PDF/TXT/CSV attachments. Group/channel timelines support text, static image and PDF/TXT/CSV attachments. Message history and send responses expose `media_id`, `media_type`, and `media_name` for attachments. Images render inline; documents are saved through Android's system document picker. The backend returns documents with `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff`.
 
 Message rows expose a long-press action menu. Users can reply to a message using `reply_to_id`, edit their own message, request deletion, or forward a message to a contact. Forwarded messages preserve the original sender and source message ID; forwarding is checked against source-conversation access and is idempotent when the same key is retried. The same UI pattern is available in direct chats, groups and channels. The backend validates the reply target and enforces author, membership, owner and administrator permissions for edits/deletions. Both `PATCH` and `PUT` are supported by the edit API; the Android client uses `PUT` for compatibility with `HttpURLConnection`. Direct-message rows display their timestamp and show whether the peer's read marker covers the message; the UI refreshes when that marker advances.
 

@@ -99,4 +99,9 @@ jobs:
           grep -q 'ImageCallback' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
           grep -q 'prepare-android-source.sh' README.md
           grep -q 'configure_android_root' scripts/prepare_android_dev_build.py
+          grep -q 'public void purchaseGift' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramGiftCatalogClient.java
+          grep -q 'Idempotency-Key' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramGiftCatalogClient.java
+          grep -q 'storePriceStars' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramGiftCatalogClient.java
+          grep -q 'showPurchaseConfirmation' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramGiftCatalogSheet.java
+          grep -q 'Цена: ' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramGiftCatalogSheet.java
           test -s tests/test_android_build_config.py

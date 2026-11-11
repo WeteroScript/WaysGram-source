@@ -27,7 +27,10 @@ import org.telegram.ui.ActionBar.Theme;
 
 import java.text.DateFormat;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
 
 /** WaysGram direct text conversation backed by /api/messages. */
 public final class WaysGramChatFragment extends BaseFragment {
@@ -52,6 +55,7 @@ public final class WaysGramChatFragment extends BaseFragment {
     };
     private long lastMessageId = 0;
     private long peerReadMessageId = 0;
+    private final Map<String, String> forwardIdempotencyKeys = new HashMap<>();
     private boolean pollInFlight = false;
     private boolean isScreenResumed = false;
     private String pendingSaveMediaId;
@@ -647,11 +651,16 @@ public final class WaysGramChatFragment extends BaseFragment {
             statusView.setText("Не удалось подготовить пересылку");
             return;
         }
+        String keyScope = messageId + ":" + recipientId;
+        String idempotencyKey = forwardIdempotencyKeys.computeIfAbsent(
+                keyScope, ignored -> "wg-forward-" + UUID.randomUUID()
+        );
         statusView.setText("Пересылаю сообщение…");
-        apiClient.post("/api/messages/" + messageId + "/forward", payload,
+        apiClient.post("/api/messages/" + messageId + "/forward", payload, idempotencyKey,
                 new WaysGramApiClient.Callback() {
                     @Override
                     public void onSuccess(JSONObject response) {
+                        forwardIdempotencyKeys.remove(keyScope);
                         statusView.setText("Сообщение переслано: " + recipientLabel);
                     }
 
@@ -843,6 +852,7 @@ public final class WaysGramChatFragment extends BaseFragment {
     public void onFragmentDestroy() {
         isScreenResumed = false;
         pollHandler.removeCallbacks(pollRunnable);
+        forwardIdempotencyKeys.clear();
         if (apiClient != null) {
             apiClient.close();
             apiClient = null;

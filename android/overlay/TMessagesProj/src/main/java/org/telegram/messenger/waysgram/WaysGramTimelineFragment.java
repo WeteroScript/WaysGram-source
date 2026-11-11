@@ -9,6 +9,8 @@ import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.InputType;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -120,6 +122,23 @@ public final class WaysGramTimelineFragment extends BaseFragment {
                 1
         ));
         messageInput.setHint(type == TYPE_GROUP ? "Сообщение в группу" : "Публикация или подпись к вложению");
+        String draftScope = type == TYPE_GROUP ? "group" : "channel";
+        messageInput.setText(WaysGramDraftStore.load(context, draftScope, targetId));
+        messageInput.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence value, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence value, int start, int before, int count) {
+            }
+
+            @Override
+            public void afterTextChanged(Editable value) {
+                WaysGramDraftStore.save(getParentActivity(), draftScope, targetId,
+                        value == null ? "" : value.toString());
+            }
+        });
         attachButton = new Button(context);
         attachButton.setText("Файл");
         attachButton.setAllCaps(false);

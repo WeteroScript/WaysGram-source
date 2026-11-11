@@ -47,7 +47,9 @@ The current Android overlay calls these API areas:
 - Personal messages: `GET /api/messages` and `POST /api/messages`.
 - Groups: `GET /api/groups`, `POST /api/groups`, group history and text-post routes.
 - Channels: `GET /api/channels`, `POST /api/channels`, channel history and text-post routes.
-- Telegram gift catalogue: `GET /api/telegram/gifts`.
+- Telegram gift catalogue and WaysGram storefront: `GET /api/telegram/gifts?all=1`.
+- Storefront purchase: `POST /api/telegram/gifts/{gift_id}/purchase` with optional `Idempotency-Key`.
+- Owned gift inventory: `GET /api/me/gifts`.
 - Gift stickers: `GET /api/telegram/gifts/{gift_id}/sticker`.
 - Image upload: `POST /api/media/images`.
 - Document upload: `POST /api/media/documents` for PDF, TXT, and CSV.
@@ -128,7 +130,11 @@ If MTProto credentials are absent or the MTProto bot connection is unavailable, 
 
 Sticker bytes are retrieved server-side and streamed through the authenticated sticker proxy. The Android client never receives the bot token or raw Telegram document credentials. Catalog refresh is cached by the backend; a temporary upstream failure should not be represented as a successful fresh sync.
 
-Telegram Stars amounts in this catalogue are not internal WaysGram Stars or Gram. The catalogue view is read-only and does not perform Telegram purchases or transfers.
+The upstream Telegram catalogue fields (including `star_count` and `currency=telegram_stars`) describe Telegram's own gift metadata; they are not the shop price. AuthBot adds separate WaysGram storefront fields: `price_stars`, `remaining`, and `for_sale`. The Android shop shows a buy action only for gifts that the administrator has enabled for sale.
+
+A purchase request to `POST /api/telegram/gifts/{gift_id}/purchase` charges the buyer's internal WaysGram Stars balance, decrements the WaysGram shop stock, and creates a WaysGram inventory record containing the original `telegram_gift_id`. `GET /api/me/gifts` returns that ID. The Android client sends an `Idempotency-Key`; retries with the same key and request return the original result rather than charging twice.
+
+Only the AuthBot Telegram admin panel may add a catalog gift by Telegram Gift ID or change its WaysGram sale price and stock. The app REST API does not expose a price/stock mutation route. This is a WaysGram-local storefront transaction: it does not send a gift through Telegram, transfer a Telegram collectible, debit a Telegram Stars balance, or perform an on-chain NFT operation. The Telegram catalogue itself remains read-only with respect to Telegram's own assets.
 
 ## Server configuration and deployment
 

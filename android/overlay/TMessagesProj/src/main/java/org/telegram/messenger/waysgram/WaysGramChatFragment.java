@@ -8,6 +8,8 @@ import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -112,6 +114,22 @@ public final class WaysGramChatFragment extends BaseFragment {
         messageInput.setHint("Сообщение или подпись к фото");
         messageInput.setSingleLine(false);
         messageInput.setMaxLines(4);
+        messageInput.setText(WaysGramDraftStore.load(context, "dm", peerId));
+        messageInput.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence value, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence value, int start, int before, int count) {
+            }
+
+            @Override
+            public void afterTextChanged(Editable value) {
+                WaysGramDraftStore.save(getParentActivity(), "dm", peerId,
+                        value == null ? "" : value.toString());
+            }
+        });
         composer.addView(messageInput, new LinearLayout.LayoutParams(
                 0,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -491,9 +509,18 @@ public final class WaysGramChatFragment extends BaseFragment {
         long messageId = message.optLong("id", 0);
         long repliedToId = message.optLong("reply_to_id", 0);
         String body = prefix + message.optString("body", "");
-        String displayText = repliedToId > 0
-                ? "Ответ на сообщение #" + repliedToId + "\n" + body
-                : body;
+        String displayText = body;
+        if (repliedToId > 0) {
+            String quotedBody = message.optString("reply_to_body", "").trim();
+            long quotedSender = message.optLong("reply_to_sender_id", 0);
+            if (quotedBody.length() > 160) {
+                quotedBody = quotedBody.substring(0, 160) + "…";
+            }
+            String quotePreview = quotedBody.isEmpty()
+                    ? "Сообщение #" + repliedToId
+                    : (quotedSender > 0 ? "@" + quotedSender + ": " : "") + quotedBody;
+            displayText = "Цитата: " + quotePreview + "\n" + body;
+        }
         long forwardedFromId = message.optLong("forwarded_from_telegram_id", 0);
         if (forwardedFromId > 0) {
             String forwardedName = message.optString("forwarded_from_display_name", "");

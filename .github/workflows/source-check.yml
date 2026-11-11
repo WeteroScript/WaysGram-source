@@ -117,6 +117,13 @@ jobs:
           grep -q 'telegram_gift_id' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramGiftCatalogSheet.java
           grep -q 'setReplyTarget' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramChatFragment.java
           grep -q 'reply_to_id' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramChatFragment.java
+          grep -q 'WaysGramDraftStore.load' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramChatFragment.java
+          grep -q 'WaysGramDraftStore.save' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramChatFragment.java
+          grep -q 'WaysGramDraftStore.load' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
+          grep -q 'WaysGramDraftStore.save' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
+          grep -q 'reply_to_body' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramChatFragment.java
+          grep -q 'reply_to_body' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
+          grep -q 'MessageDigest.getInstance("SHA-256")' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramDraftStore.java
           grep -q 'setReplyTarget' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
           grep -q 'reply_to_id' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
           grep -q 'showMessageActions' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramChatFragment.java

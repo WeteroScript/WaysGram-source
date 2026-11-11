@@ -9,6 +9,8 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.InputFilter;
 import android.text.InputType;
 import android.view.Gravity;
@@ -39,7 +41,23 @@ public final class WaysGramHomeFragment extends BaseFragment {
     private TextView profileView;
     private TextView walletView;
     private TextView statusView;
+    private TextView inboxSummaryView;
     private ImageView avatarView;
+    private final Handler eventHandler = new Handler(Looper.getMainLooper());
+    private final Runnable eventRetryRunnable = new Runnable() {
+        @Override
+        public void run() {
+            pollUnreadEvents();
+        }
+    };
+    private boolean isScreenResumed;
+    private boolean eventsReady;
+    private boolean eventsInitializing;
+    private boolean eventPollInFlight;
+    private long lastEventId;
+    private int unreadDmCount;
+    private int unreadGroupCount;
+    private int unreadChannelCount;
     private String currentDisplayName = "";
     private String currentUsername = "";
     private String currentBio = "";
@@ -87,6 +105,7 @@ public final class WaysGramHomeFragment extends BaseFragment {
         profileView = addLabel(context, content, "Загрузка профиля…", 19, true);
         walletView = addLabel(context, content, "Баланс загружается…", 14, false);
         statusView = addLabel(context, content, "", 13, false);
+        inboxSummaryView = addLabel(context, content, "Непрочитанные сообщения загружаются…", 13, true);
 
         addButton(context, content, "Редактировать профиль", this::showProfileEditor);
         addButton(context, content, "Фото профиля", this::showAvatarActions);
@@ -117,6 +136,7 @@ public final class WaysGramHomeFragment extends BaseFragment {
 
         fragmentView = scroll;
         loadProfile();
+        loadUnreadSummary();
         return scroll;
     }
 
@@ -228,6 +248,210 @@ public final class WaysGramHomeFragment extends BaseFragment {
                 walletView.setText(message);
             }
         });
+    }
+
+    private void updateUnreadSummary() {
+        if (inboxSummaryView == null) {
+            return;
+        }
+        int total = unreadDmCount + unreadGroupCount + unreadChannelCount;
+        if (total == 0) {
+            inboxSummaryView.setText("Новых сообщений нет");
+            return;
+        }
+        inboxSummaryView.setText(
+                "Непрочитано: " + total
+                        + " · личные: " + unreadDmCount
+                        + " · группы: " + unreadGroupCount
+                        + " · каналы: " + unreadChannelCount
+        );
+    }
+
+    private void loadUnreadSummary() {
+        if (apiClient == null) {
+            return;
+        }
+        apiClient.get("/api/conversations", new WaysGramApiClient.Callback() {
+            @Override
+            public void onSuccess(JSONObject response) {
+                JSONArray rows = response.optJSONArray("conversations");
+                int count = 0;
+                if (rows != null) {
+                    for (int i = 0; i < rows.length(); i++) {
+                        JSONObject row = rows.optJSONObject(i);
+                        if (row != null) {
+                            count += Math.max(0, row.optInt("unread_count", 0));
+                        }
+                    }
+                }
+                unreadDmCount = count;
+                updateUnreadSummary();
+            }
+
+            @Override
+            public void onError(String message, int statusCode) {
+                if (statusCode == 401 && getParentActivity() != null) {
+                    sessionStore.clearSession();
+                    presentFragment(new WaysGramLoginFragment(), true);
+                }
+            }
+        });
+        apiClient.get("/api/groups", new WaysGramApiClient.Callback() {
+            @Override
+            public void onSuccess(JSONObject response) {
+                JSONArray rows = response.optJSONArray("groups");
+                int count = 0;
+                if (rows != null) {
+                    for (int i = 0; i < rows.length(); i++) {
+                        JSONObject row = rows.optJSONObject(i);
+                        if (row != null) {
+                            count += Math.max(0, row.optInt("unread_count", 0));
+                        }
+                    }
+                }
+                unreadGroupCount = count;
+                updateUnreadSummary();
+            }
+
+            @Override
+            public void onError(String message, int statusCode) {
+                if (statusCode == 401 && getParentActivity() != null) {
+                    sessionStore.clearSession();
+                    presentFragment(new WaysGramLoginFragment(), true);
+                }
+            }
+        });
+        apiClient.get("/api/channels", new WaysGramApiClient.Callback() {
+            @Override
+            public void onSuccess(JSONObject response) {
+                JSONArray rows = response.optJSONArray("channels");
+                int count = 0;
+                if (rows != null) {
+                    for (int i = 0; i < rows.length(); i++) {
+                        JSONObject row = rows.optJSONObject(i);
+                        if (row != null) {
+                            count += Math.max(0, row.optInt("unread_count", 0));
+                        }
+                    }
+                }
+                unreadChannelCount = count;
+                updateUnreadSummary();
+            }
+
+            @Override
+            public void onError(String message, int statusCode) {
+                if (statusCode == 401 && getParentActivity() != null) {
+                    sessionStore.clearSession();
+                    presentFragment(new WaysGramLoginFragment(), true);
+                }
+            }
+        });
+    }
+
+    private void initializeUnreadEventCursor() {
+        if (apiClient == null || !isScreenResumed || eventsReady || eventsInitializing) {
+            return;
+        }
+        eventsInitializing = true;
+        apiClient.get("/api/events", new WaysGramApiClient.Callback() {
+            @Override
+            public void onSuccess(JSONObject response) {
+                eventsInitializing = false;
+                if (!isScreenResumed) {
+                    return;
+                }
+                lastEventId = response.optLong("latest_id", 0);
+                eventsReady = true;
+                pollUnreadEvents();
+            }
+
+            @Override
+            public void onError(String message, int statusCode) {
+                eventsInitializing = false;
+                if (statusCode == 401 && getParentActivity() != null) {
+                    sessionStore.clearSession();
+                    presentFragment(new WaysGramLoginFragment(), true);
+                } else {
+                    scheduleEventRetry(4000);
+                }
+            }
+        });
+    }
+
+    private void scheduleEventRetry(int delayMs) {
+        if (apiClient != null && isScreenResumed) {
+            eventHandler.removeCallbacks(eventRetryRunnable);
+            eventHandler.postDelayed(eventRetryRunnable, delayMs);
+        }
+    }
+
+    private void pollUnreadEvents() {
+        if (apiClient == null || !isScreenResumed || eventPollInFlight) {
+            return;
+        }
+        if (!eventsReady) {
+            initializeUnreadEventCursor();
+            return;
+        }
+        eventPollInFlight = true;
+        apiClient.getEventLongPoll(
+                "/api/events?after_id=" + lastEventId + "&wait_seconds=20",
+                new WaysGramApiClient.Callback() {
+                    @Override
+                    public void onSuccess(JSONObject response) {
+                        eventPollInFlight = false;
+                        if (!isScreenResumed) {
+                            return;
+                        }
+                        JSONArray events = response.optJSONArray("events");
+                        boolean refreshUnread = false;
+                        int count = events == null ? 0 : events.length();
+                        for (int i = 0; i < count; i++) {
+                            JSONObject event = events.optJSONObject(i);
+                            if (event != null && "new_message".equals(event.optString("kind"))) {
+                                refreshUnread = true;
+                                break;
+                            }
+                        }
+                        lastEventId = Math.max(lastEventId, response.optLong("latest_id", lastEventId));
+                        if (refreshUnread) {
+                            loadUnreadSummary();
+                        }
+                        pollUnreadEvents();
+                    }
+
+                    @Override
+                    public void onError(String message, int statusCode) {
+                        eventPollInFlight = false;
+                        if (statusCode == 401 && getParentActivity() != null) {
+                            sessionStore.clearSession();
+                            presentFragment(new WaysGramLoginFragment(), true);
+                        } else {
+                            scheduleEventRetry(4000);
+                        }
+                    }
+                }
+        );
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        isScreenResumed = true;
+        loadUnreadSummary();
+        eventHandler.removeCallbacks(eventRetryRunnable);
+        if (eventsReady) {
+            pollUnreadEvents();
+        } else {
+            initializeUnreadEventCursor();
+        }
+    }
+
+    @Override
+    public void onPause() {
+        isScreenResumed = false;
+        eventHandler.removeCallbacks(eventRetryRunnable);
+        super.onPause();
     }
 
     private void showProfileEditor() {
@@ -553,6 +777,8 @@ public final class WaysGramHomeFragment extends BaseFragment {
 
     @Override
     public void onFragmentDestroy() {
+        isScreenResumed = false;
+        eventHandler.removeCallbacks(eventRetryRunnable);
         if (apiClient != null) {
             apiClient.close();
             apiClient = null;

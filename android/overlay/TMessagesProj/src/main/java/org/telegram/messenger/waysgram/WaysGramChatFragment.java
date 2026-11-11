@@ -509,9 +509,18 @@ public final class WaysGramChatFragment extends BaseFragment {
         long messageId = message.optLong("id", 0);
         long repliedToId = message.optLong("reply_to_id", 0);
         String body = prefix + message.optString("body", "");
-        String displayText = repliedToId > 0
-                ? "Ответ на сообщение #" + repliedToId + "\n" + body
-                : body;
+        String displayText = body;
+        if (repliedToId > 0) {
+            String quotedBody = message.optString("reply_to_body", "").trim();
+            long quotedSender = message.optLong("reply_to_sender_id", 0);
+            if (quotedBody.length() > 160) {
+                quotedBody = quotedBody.substring(0, 160) + "…";
+            }
+            String quotePreview = quotedBody.isEmpty()
+                    ? "Сообщение #" + repliedToId
+                    : (quotedSender > 0 ? "@" + quotedSender + ": " : "") + quotedBody;
+            displayText = "Цитата: " + quotePreview + "\n" + body;
+        }
         long forwardedFromId = message.optLong("forwarded_from_telegram_id", 0);
         if (forwardedFromId > 0) {
             String forwardedName = message.optString("forwarded_from_display_name", "");

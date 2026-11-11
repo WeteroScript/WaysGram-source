@@ -46,6 +46,7 @@ jobs:
             WaysGramDirectoryFragment.java \
             WaysGramChatFragment.java \
             WaysGramTimelineFragment.java \
+            WaysGramCloudDraftSync.java \
             WaysGramGiftCatalogClient.java \
             WaysGramGiftCatalogSheet.java \
             WaysGramBotsFragment.java \
@@ -133,6 +134,14 @@ jobs:
           grep -q 'WaysGramDraftStore.save' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramChatFragment.java
           grep -q 'WaysGramDraftStore.load' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
           grep -q 'WaysGramDraftStore.save' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
+          grep -q 'new WaysGramCloudDraftSync(context, apiClient, "dm", peerId, messageInput)' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramChatFragment.java
+          grep -q 'new WaysGramCloudDraftSync' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
+          grep -q 'apiClient.get(path()' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramCloudDraftSync.java
+          grep -q 'apiClient.put("/api/drafts"' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramCloudDraftSync.java
+          grep -q 'apiClient.delete(path()' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramCloudDraftSync.java
+          grep -q 'SAVE_DELAY_MS = 750L' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramCloudDraftSync.java
+          grep -q 'cloudDraftSync.flush()' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramChatFragment.java
+          grep -q 'cloudDraftSync.flush()' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
           grep -q 'reply_to_body' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramChatFragment.java
           grep -q 'reply_to_body' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
           grep -q 'MessageDigest.getInstance("SHA-256")' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramDraftStore.java

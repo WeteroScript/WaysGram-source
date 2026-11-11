@@ -192,17 +192,17 @@ public final class WaysGramGiftCatalogSheet extends BottomSheet {
                             continue;
                         }
                         if (text.length() > 0) {
-                            text.append("\\n\\n");
+                            text.append("\n\n");
                         }
                         String name = gift.optString("gift_name", "Подарок WaysGram");
                         String serial = gift.optString("serial_number", "");
                         String telegramGiftId = gift.optString("telegram_gift_id", "");
                         text.append(name);
                         if (!serial.isEmpty()) {
-                            text.append("\\nСерийный номер: ").append(serial);
+                            text.append("\nСерийный номер: ").append(serial);
                         }
                         if (!telegramGiftId.isEmpty()) {
-                            text.append("\\nTelegram Gift ID: ").append(telegramGiftId);
+                            text.append("\nTelegram Gift ID: ").append(telegramGiftId);
                         }
                     }
                     dialog.setMessage(text.length() == 0 ? "Инвентарь пока пуст." : text.toString());

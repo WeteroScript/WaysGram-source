@@ -9,8 +9,6 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Build;
 
-import androidx.core.app.NotificationManagerCompat;
-
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
 import com.google.firebase.messaging.FirebaseMessaging;
@@ -153,9 +151,10 @@ public final class WaysGramPushManager {
                 return null;
             }
 
-            // FirebaseMessaging.getInstance(FirebaseApp) is not public in the
-            // pinned SDK. FirebaseApp.get(Class) is the documented component
-            // container access path used by the SDK's own multi-app examples.
+            // FirebaseMessaging.getInstance(FirebaseApp) is package-private in
+            // the pinned SDK. FirebaseApp.get(Class) is a public-but-hidden
+            // @KeepForSdk workaround; keep the Firebase Messaging version pinned
+            // and verify this integration after any SDK upgrade.
             return app.get(FirebaseMessaging.class);
         }
     }

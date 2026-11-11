@@ -1,5 +1,6 @@
 package org.telegram.messenger.waysgram;
 
+import android.app.AlertDialog;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -9,11 +10,13 @@ import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -23,6 +26,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.ui.ActionBar.BottomSheet;
 import org.telegram.ui.ActionBar.Theme;
+import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -44,6 +48,7 @@ public final class WaysGramGiftCatalogSheet extends BottomSheet {
 
     private TextView statusView;
     private ProgressBar progressBar;
+    private final Set<String> purchasingGiftIds = new HashSet<>();
 
     public WaysGramGiftCatalogSheet(
             Context context,
@@ -155,6 +160,65 @@ public final class WaysGramGiftCatalogSheet extends BottomSheet {
         });
     }
 
+    private void showPurchaseConfirmation(WaysGramGiftCatalogClient.Gift gift) {
+        if (gift == null || !gift.forSale || !purchasingGiftIds.add(gift.id)) {
+            return;
+        }
+        adapter.notifyDataSetChanged();
+        new AlertDialog.Builder(getContext())
+                .setTitle("Подтвердить покупку")
+                .setMessage(
+                        gift.title + "\n\nЦена: " + gift.storePriceStars
+                                + " WaysGram Stars\nОсталось в магазине: " + gift.storeRemaining
+                )
+                .setNegativeButton("Отмена", (dialog, which) -> finishPurchaseAttempt(gift.id))
+                .setPositiveButton("Купить", (dialog, which) -> {
+                    statusView.setText("Покупка подарка…");
+                    catalogClient.purchaseGift(gift, new WaysGramGiftCatalogClient.PurchaseCallback() {
+                        @Override
+                        public void onPurchased(JSONObject result) {
+                            AndroidUtilities.runOnUIThread(() -> {
+                                if (isDismissed()) {
+                                    return;
+                                }
+                                finishPurchaseAttempt(gift.id);
+                                JSONObject purchasedGift = result.optJSONObject("gift");
+                                String serial = purchasedGift == null
+                                        ? ""
+                                        : purchasedGift.optString("serial_number", "");
+                                int balance = result.optInt("stars", -1);
+                                String confirmation = "Подарок куплен"
+                                        + (serial.length() > 0 ? " · " + serial : "")
+                                        + (balance >= 0 ? " · баланс " + balance + " Stars" : "");
+                                statusView.setText(confirmation);
+                                Toast.makeText(getContext(), confirmation, Toast.LENGTH_LONG).show();
+                                loadCatalog();
+                            });
+                        }
+
+                        @Override
+                        public void onError(String message) {
+                            AndroidUtilities.runOnUIThread(() -> {
+                                if (isDismissed()) {
+                                    return;
+                                }
+                                finishPurchaseAttempt(gift.id);
+                                statusView.setText("Покупка не выполнена: " + message);
+                            });
+                        }
+                    });
+                })
+                .setOnCancelListener(dialog -> finishPurchaseAttempt(gift.id))
+                .show();
+    }
+
+    private void finishPurchaseAttempt(String giftId) {
+        purchasingGiftIds.remove(giftId);
+        if (!isDismissed() && adapter != null) {
+            adapter.notifyDataSetChanged();
+        }
+    }
+
     private final class GiftAdapter extends RecyclerView.Adapter<GiftHolder> {
         private final ArrayList<WaysGramGiftCatalogClient.Gift> items = new ArrayList<>();
         private final Map<String, Bitmap> stickers = new HashMap<>();
@@ -245,6 +309,7 @@ public final class WaysGramGiftCatalogSheet extends BottomSheet {
         private final TextView titleView;
         private final TextView priceView;
         private final TextView stockView;
+        private final Button buyButton;
 
         GiftHolder(Context context) {
             super(new LinearLayout(context));
@@ -309,21 +374,42 @@ public final class WaysGramGiftCatalogSheet extends BottomSheet {
             row.addView(details, new LinearLayout.LayoutParams(
                     0, ViewGroup.LayoutParams.WRAP_CONTENT, 1
             ));
+
+            buyButton = new Button(context);
+            buyButton.setText("Купить");
+            buyButton.setTextSize(12);
+            LinearLayout.LayoutParams buyParams = new LinearLayout.LayoutParams(
+                    AndroidUtilities.dp(88), AndroidUtilities.dp(48)
+            );
+            buyParams.leftMargin = AndroidUtilities.dp(6);
+            row.addView(buyButton, buyParams);
         }
 
         void bind(WaysGramGiftCatalogClient.Gift gift, @Nullable Bitmap sticker) {
             titleView.setText(gift.title);
-            priceView.setText(gift.starCount + " Telegram Stars");
-            if (gift.auction) {
+            if (gift.forSale) {
+                priceView.setText("Цена: " + gift.storePriceStars + " WaysGram Stars");
+                stockView.setText("В наличии: " + gift.storeRemaining);
+                stockView.setVisibility(View.VISIBLE);
+                buyButton.setVisibility(View.VISIBLE);
+                buyButton.setEnabled(!purchasingGiftIds.contains(gift.id));
+                buyButton.setText("Купить");
+                buyButton.setOnClickListener(view -> showPurchaseConfirmation(gift));
+            } else {
+                priceView.setText(gift.starCount + " Telegram Stars");
+                buyButton.setVisibility(View.GONE);
+                buyButton.setOnClickListener(null);
+            }
+            if (!gift.forSale && gift.auction) {
                 stockView.setText("Аукционный тип подарка");
                 stockView.setVisibility(View.VISIBLE);
-            } else if (gift.soldOut) {
+            } else if (!gift.forSale && gift.soldOut) {
                 stockView.setText("Распродан");
                 stockView.setVisibility(View.VISIBLE);
-            } else if (gift.limited && gift.remainingCount != null && gift.totalCount != null) {
+            } else if (!gift.forSale && gift.limited && gift.remainingCount != null && gift.totalCount != null) {
                 stockView.setText("Осталось " + gift.remainingCount + " из " + gift.totalCount);
                 stockView.setVisibility(View.VISIBLE);
-            } else if (gift.premium) {
+            } else if (!gift.forSale && gift.premium) {
                 stockView.setText("Требуется Premium");
                 stockView.setVisibility(View.VISIBLE);
             } else {
@@ -344,6 +430,7 @@ public final class WaysGramGiftCatalogSheet extends BottomSheet {
 
     @Override
     public void dismiss() {
+        purchasingGiftIds.clear();
         if (adapter != null) {
             adapter.clear();
         }

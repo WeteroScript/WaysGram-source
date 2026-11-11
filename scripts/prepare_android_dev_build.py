@@ -92,21 +92,21 @@ def configure_default_api_base_url(android_root: Path) -> None:
 
 def configure_waysgram_firebase(android_root: Path) -> bool:
     """Generate secondary FirebaseOptions from the registered WaysGram Android app JSON."""
-    raw_config = os.getenv("WAYSGRAM_FIREBASE_CONFIG_JSON", "").strip()
+    raw_config = (os.getenv("FIREBASE_CONFIG", "").strip() or os.getenv("WAYSGRAM_FIREBASE_CONFIG_JSON", "").strip())
     required = os.getenv("WAYSGRAM_REQUIRE_FIREBASE_CONFIG", "").strip().lower() in {
         "1", "true", "yes"
     }
     if not raw_config:
         if required:
             raise ValueError(
-                "WAYSGRAM_FIREBASE_CONFIG_JSON is required for an Android APK build"
+                "FIREBASE_CONFIG is required for an Android APK build"
             )
         return False
 
     try:
         config = json.loads(raw_config)
     except json.JSONDecodeError as exc:
-        raise ValueError("WAYSGRAM_FIREBASE_CONFIG_JSON must contain valid JSON") from exc
+        raise ValueError("FIREBASE_CONFIG must contain valid Firebase JSON") from exc
 
     project_info = config.get("project_info")
     clients = config.get("client")
@@ -171,6 +171,34 @@ public final class WaysGramFirebaseConfig {{
     return True
 
 
+def configured_android_package() -> str:
+    """Read the Android package from the existing Firebase config secret."""
+    raw_config = (os.getenv("FIREBASE_CONFIG", "").strip() or os.getenv("WAYSGRAM_FIREBASE_CONFIG_JSON", "").strip())
+    if not raw_config:
+        return WAYSGRAM_FIREBASE_PACKAGE_NAME
+    try:
+        config = json.loads(raw_config)
+    except json.JSONDecodeError as exc:
+        raise ValueError("FIREBASE_CONFIG must contain valid Firebase JSON") from exc
+    project_info = config.get("project_info")
+    clients = config.get("client")
+    if not isinstance(project_info, dict) or not isinstance(clients, list):
+        raise ValueError("FIREBASE_CONFIG is missing project_info or client")
+    packages = []
+    for client in clients:
+        client_info = client.get("client_info", {}) if isinstance(client, dict) else {}
+        android_info = client_info.get("android_client_info", {}) if isinstance(client_info, dict) else {}
+        package_name = str(android_info.get("package_name") or "").strip()
+        if package_name:
+            packages.append(package_name)
+    if WAYSGRAM_FIREBASE_PACKAGE_NAME not in packages:
+        raise ValueError(
+            "FIREBASE_CONFIG must include the registered Android package "
+            + WAYSGRAM_FIREBASE_PACKAGE_NAME
+        )
+    return WAYSGRAM_FIREBASE_PACKAGE_NAME
+
+
 def configure_android_root(android_root: Path) -> None:
     if not (android_root / "gradlew").is_file():
         raise FileNotFoundError(f"Android Gradle wrapper not found in {android_root}")
@@ -179,7 +207,7 @@ def configure_android_root(android_root: Path) -> None:
     content = gradle_properties.read_text(encoding="utf-8")
     content = replace_one(
         r"^APP_PACKAGE=.*$",
-        "APP_PACKAGE=org.telegram.messenger",
+        f"APP_PACKAGE={configured_android_package()}",
         content,
         "Android application ID",
     )

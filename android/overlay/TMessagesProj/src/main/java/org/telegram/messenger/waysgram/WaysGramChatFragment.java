@@ -37,6 +37,7 @@ public final class WaysGramChatFragment extends BaseFragment {
     private Button sendButton;
     private TextView statusView;
     private boolean messageSendInFlight = false;
+    private long replyToMessageId = 0;
     private final Handler pollHandler = new Handler(Looper.getMainLooper());
     private final Runnable pollRunnable = new Runnable() {
         @Override
@@ -370,7 +371,17 @@ public final class WaysGramChatFragment extends BaseFragment {
         long sender = message.optLong("sender_id", 0);
         long recipient = message.optLong("recipient_id", 0);
         String prefix = sender == peerId && recipient != peerId ? peerTitle + ": " : "Вы: ";
-        row.setText(prefix + message.optString("body", ""));
+        long messageId = message.optLong("id", 0);
+        long repliedToId = message.optLong("reply_to_id", 0);
+        String body = prefix + message.optString("body", "");
+        row.setText(repliedToId > 0 ? "Ответ на сообщение #" + repliedToId + "\\n" + body : body);
+        row.setContentDescription("Удерживайте сообщение, чтобы ответить");
+        if (messageId > 0) {
+            row.setOnLongClickListener(view -> {
+                setReplyTarget(messageId);
+                return true;
+            });
+        }
         row.setTextSize(14);
         row.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
         row.setPadding(AndroidUtilities.dp(10), AndroidUtilities.dp(8),
@@ -416,6 +427,18 @@ public final class WaysGramChatFragment extends BaseFragment {
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
             fileButton.setOnClickListener(view -> saveDocument(mediaId, mediaName, mediaType));
         }
+    }
+
+    private void setReplyTarget(long messageId) {
+        replyToMessageId = messageId;
+        statusView.setText("Ответ на сообщение #" + messageId + " · нажмите сюда, чтобы отменить");
+        statusView.setOnClickListener(view -> clearReplyTarget());
+    }
+
+    private void clearReplyTarget() {
+        replyToMessageId = 0;
+        statusView.setOnClickListener(null);
+        statusView.setText("Ответ отменён");
     }
 
     private void saveDocument(String mediaId, String mediaName, String mediaType) {
@@ -482,6 +505,9 @@ public final class WaysGramChatFragment extends BaseFragment {
         try {
             payload.put("recipient_id", peerId);
             payload.put("body", body);
+            if (replyToMessageId > 0) {
+                payload.put("reply_to_id", replyToMessageId);
+            }
         } catch (Exception exception) {
             statusView.setText("Не удалось подготовить сообщение");
             return;
@@ -493,6 +519,8 @@ public final class WaysGramChatFragment extends BaseFragment {
             public void onSuccess(JSONObject response) {
                 setMessageSendInFlight(false);
                 messageInput.setText("");
+                replyToMessageId = 0;
+                statusView.setOnClickListener(null);
                 statusView.setText("Сообщение отправлено");
                 loadMessages();
             }

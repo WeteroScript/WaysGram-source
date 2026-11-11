@@ -190,6 +190,10 @@ jobs:
           grep -q 'loadGroupJoinRequests' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
           grep -q 'api/groups/" + targetId + "/join-requests' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
           grep -q 'join_requested' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramDirectoryFragment.java
+          grep -q 'Настроить медленный режим' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
+          grep -q 'apiClient.put("/api/groups/" + targetId + "/slow-mode"' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
+          grep -q 'slow_mode_seconds' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
+          grep -q 'slowModeLabel' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
           grep -q 'new WaysGramUserProfileFragment' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramDirectoryFragment.java
           grep -q 'common_groups' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramUserProfileFragment.java
           grep -q 'common_contacts' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramUserProfileFragment.java

@@ -420,7 +420,7 @@ public final class WaysGramChatFragment extends BaseFragment {
             return;
         }
         pollInFlight = true;
-        apiClient.get("/api/messages?with=" + peerId + "&after_id=" + lastMessageId + "&wait_seconds=20",
+        apiClient.getLongPoll("/api/messages?with=" + peerId + "&after_id=" + lastMessageId + "&wait_seconds=20",
                 new WaysGramApiClient.Callback() {
                     @Override
                     public void onSuccess(JSONObject response) {

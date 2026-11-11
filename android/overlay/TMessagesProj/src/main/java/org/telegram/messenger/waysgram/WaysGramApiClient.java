@@ -94,6 +94,10 @@ public final class WaysGramApiClient implements AutoCloseable {
         execute("POST", path, payload == null ? new JSONObject() : payload, callback);
     }
 
+    public void post(String path, JSONObject payload, String idempotencyKey, Callback callback) {
+        execute("POST", path, payload == null ? new JSONObject() : payload, callback, idempotencyKey);
+    }
+
     public void put(String path, JSONObject payload, Callback callback) {
         execute("PUT", path, payload == null ? new JSONObject() : payload, callback);
     }
@@ -133,9 +137,19 @@ public final class WaysGramApiClient implements AutoCloseable {
     }
 
     private void execute(String method, String path, JSONObject payload, Callback callback) {
+        execute(method, path, payload, callback, null);
+    }
+
+    private void execute(
+            String method,
+            String path,
+            JSONObject payload,
+            Callback callback,
+            String idempotencyKey
+    ) {
         ioExecutor.execute(() -> {
             try {
-                JSONObject response = request(method, path, payload);
+                JSONObject response = request(method, path, payload, idempotencyKey);
                 deliverSuccess(callback, response);
             } catch (ApiException exception) {
                 deliverError(callback, exception.getMessage(), exception.statusCode);
@@ -438,6 +452,15 @@ public final class WaysGramApiClient implements AutoCloseable {
     }
 
     private JSONObject request(String method, String path, JSONObject payload) throws IOException {
+        return request(method, path, payload, null);
+    }
+
+    private JSONObject request(
+            String method,
+            String path,
+            JSONObject payload,
+            String idempotencyKey
+    ) throws IOException {
         String baseUrl = sessionStore.getApiBaseUrl();
         String token = sessionStore.getWaysGramSessionToken();
         if (baseUrl == null || token == null || token.length() == 0) {
@@ -457,6 +480,9 @@ public final class WaysGramApiClient implements AutoCloseable {
             connection.setReadTimeout(READ_TIMEOUT_MS);
             connection.setRequestProperty("Accept", "application/json");
             connection.setRequestProperty("Authorization", "Bearer " + token);
+            if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
+                connection.setRequestProperty("Idempotency-Key", idempotencyKey.trim());
+            }
             if ("POST".equals(method) || "PUT".equals(method)) {
                 connection.setDoOutput(true);
                 connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");

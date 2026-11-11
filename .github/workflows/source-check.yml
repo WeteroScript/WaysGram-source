@@ -116,6 +116,13 @@ jobs:
           grep -q 'setReplyTarget' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
           grep -q 'reply_to_id' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
           grep -q 'showMessageActions' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramChatFragment.java
+          grep -q 'Переслать' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramChatFragment.java
+          grep -q 'chooseForwardRecipient' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramChatFragment.java
+          grep -q 'forwardMessage(messageId' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramChatFragment.java
+          grep -q 'forwarded_from_telegram_id' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramChatFragment.java
+          grep -q 'String idempotencyKey, Callback callback' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramApiClient.java
+          grep -q 'Idempotency-Key' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramApiClient.java
+          grep -q 'forwardIdempotencyKeys' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramChatFragment.java
           grep -q 'showMessageActions' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
           grep -q 'apiClient.put' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramChatFragment.java
           grep -q 'apiClient.delete' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramChatFragment.java

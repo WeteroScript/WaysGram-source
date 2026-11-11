@@ -27,7 +27,10 @@ import org.telegram.ui.ActionBar.Theme;
 
 import java.text.DateFormat;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
 
 /** WaysGram direct text conversation backed by /api/messages. */
 public final class WaysGramChatFragment extends BaseFragment {
@@ -52,6 +55,7 @@ public final class WaysGramChatFragment extends BaseFragment {
     };
     private long lastMessageId = 0;
     private long peerReadMessageId = 0;
+    private final Map<String, String> forwardIdempotencyKeys = new HashMap<>();
     private boolean pollInFlight = false;
     private boolean isScreenResumed = false;
     private String pendingSaveMediaId;
@@ -490,6 +494,14 @@ public final class WaysGramChatFragment extends BaseFragment {
         String displayText = repliedToId > 0
                 ? "Ответ на сообщение #" + repliedToId + "\n" + body
                 : body;
+        long forwardedFromId = message.optLong("forwarded_from_telegram_id", 0);
+        if (forwardedFromId > 0) {
+            String forwardedName = message.optString("forwarded_from_display_name", "");
+            if (forwardedName.isEmpty()) {
+                forwardedName = "пользователя " + forwardedFromId;
+            }
+            displayText = "Переслано от " + forwardedName + "\n" + displayText;
+        }
         long createdAt = message.optLong("created_at", 0);
         if (createdAt > 0) {
             String time = DateFormat.getTimeInstance(DateFormat.SHORT, Locale.getDefault())
@@ -561,7 +573,7 @@ public final class WaysGramChatFragment extends BaseFragment {
         if (messageId <= 0) {
             return;
         }
-        String[] actions = {"Ответить", "Редактировать", "Удалить"};
+        String[] actions = {"Ответить", "Редактировать", "Удалить", "Переслать"};
         new AlertDialog.Builder(getParentActivity())
                 .setItems(actions, (dialog, which) -> {
                     if (which == 0) {
@@ -570,9 +582,93 @@ public final class WaysGramChatFragment extends BaseFragment {
                         editMessage(messageId, message.optString("body", ""));
                     } else if (which == 2) {
                         confirmDeleteMessage(messageId);
+                    } else if (which == 3) {
+                        chooseForwardRecipient(messageId);
                     }
                 })
                 .show();
+    }
+
+    private void chooseForwardRecipient(long messageId) {
+        statusView.setText("Загружаю список контактов…");
+        apiClient.get("/api/contacts", new WaysGramApiClient.Callback() {
+            @Override
+            public void onSuccess(JSONObject response) {
+                JSONArray contacts = response.optJSONArray("contacts");
+                int count = contacts == null ? 0 : contacts.length();
+                if (count == 0) {
+                    statusView.setText("Сначала добавьте получателя в контакты");
+                    new AlertDialog.Builder(getParentActivity())
+                            .setTitle("Пересылка сообщения")
+                            .setMessage("В списке контактов пока нет получателей. Откройте раздел «Контакты» и добавьте пользователя.")
+                            .setPositiveButton("Закрыть", null)
+                            .show();
+                    return;
+                }
+                String[] labels = new String[count];
+                long[] userIds = new long[count];
+                for (int i = 0; i < count; i++) {
+                    JSONObject contact = contacts.optJSONObject(i);
+                    if (contact == null) {
+                        labels[i] = "Пользователь";
+                        continue;
+                    }
+                    userIds[i] = contact.optLong("id", 0);
+                    String name = contact.optString("display_name", "");
+                    String username = contact.optString("username", "");
+                    if (name.isEmpty()) {
+                        name = username.isEmpty() ? "Пользователь " + userIds[i] : username;
+                    }
+                    labels[i] = username.isEmpty() ? name : name + " · @" + username;
+                }
+                new AlertDialog.Builder(getParentActivity())
+                        .setTitle("Переслать кому?")
+                        .setItems(labels, (dialog, which) -> {
+                            if (which >= 0 && which < userIds.length && userIds[which] > 0) {
+                                forwardMessage(messageId, userIds[which], labels[which]);
+                            }
+                        })
+                        .setNegativeButton("Отмена", null)
+                        .show();
+            }
+
+            @Override
+            public void onError(String message, int statusCode) {
+                statusView.setText(message);
+                if (statusCode == 401) {
+                    WaysGramSessionStore.getInstance(getParentActivity()).clearSession();
+                    presentFragment(new WaysGramLoginFragment(), true);
+                }
+            }
+        });
+    }
+
+    private void forwardMessage(long messageId, long recipientId, String recipientLabel) {
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("recipient_id", recipientId);
+        } catch (Exception exception) {
+            statusView.setText("Не удалось подготовить пересылку");
+            return;
+        }
+        String keyScope = messageId + ":" + recipientId;
+        String idempotencyKey = forwardIdempotencyKeys.computeIfAbsent(
+                keyScope, ignored -> "wg-forward-" + UUID.randomUUID()
+        );
+        statusView.setText("Пересылаю сообщение…");
+        apiClient.post("/api/messages/" + messageId + "/forward", payload, idempotencyKey,
+                new WaysGramApiClient.Callback() {
+                    @Override
+                    public void onSuccess(JSONObject response) {
+                        forwardIdempotencyKeys.remove(keyScope);
+                        statusView.setText("Сообщение переслано: " + recipientLabel);
+                    }
+
+                    @Override
+                    public void onError(String message, int statusCode) {
+                        statusView.setText(message);
+                    }
+                });
     }
 
     private void editMessage(long messageId, String currentBody) {
@@ -756,6 +852,7 @@ public final class WaysGramChatFragment extends BaseFragment {
     public void onFragmentDestroy() {
         isScreenResumed = false;
         pollHandler.removeCallbacks(pollRunnable);
+        forwardIdempotencyKeys.clear();
         if (apiClient != null) {
             apiClient.close();
             apiClient = null;

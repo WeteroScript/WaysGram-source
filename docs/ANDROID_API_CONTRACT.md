@@ -89,6 +89,8 @@ The group timeline loads `GET /api/groups/{group_id}`, including the signed-in u
 - `DELETE /api/groups/{group_id}/members/{telegram_id}` to remove a member or leave (subject to server role rules).
 - `POST /api/groups/{group_id}/admins` with `telegram_id` to promote a member (owner only).
 - `DELETE /api/groups/{group_id}/admins/{telegram_id}` to return an admin to member (owner only).
+- `POST /api/groups/{group_id}/invites` creates an invite link (owner/admin; `expires_in_hours` 1–8760 and optional `max_uses` 1–10000); the database stores only a hash of the token.
+- `GET /api/groups/invites/{token}` previews a valid invite; `POST /api/groups/join` accepts a link or token and joins the group; `DELETE /api/groups/{group_id}/invites/{token}` revokes an invite (owner/admin). Repeated use by an existing member does not consume another use.
 
 The channel timeline loads `GET /api/channels/{channel_id}/admins`, which returns `owner_telegram_id`, `my_role`, and the channel administrator list. Only the channel owner can use:
 

@@ -54,7 +54,10 @@ jobs:
             WaysGramGiftCatalogSheet.java \
             WaysGramBotsFragment.java \
             WaysGramBotDetailFragment.java \
-            WaysGramBotChatFragment.java; do
+            WaysGramBotChatFragment.java \
+            WaysGramFirebaseConfig.java \
+            WaysGramPushManager.java \
+            WaysGramPushNotifications.java; do
             test -s "android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/$source"
           done
           grep -q 'patch_launch_source' scripts/apply-android-patches.py
@@ -104,6 +107,11 @@ jobs:
           grep -q 'wait_seconds=20' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramBotChatFragment.java
           grep -q 'READ_TIMEOUT_MS = 30000' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramApiClient.java
           grep -q 'getLongPoll' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramApiClient.java
+          grep -q 'FirebaseApp.initializeApp' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramPushManager.java
+          grep -q 'app.get(FirebaseMessaging.class)' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramPushManager.java
+          grep -q 'apiClient.post("/api/push/register"' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramPushManager.java
+          grep -q 'WaysGramPushNotifications.show(this, message)' scripts/apply-android-patches.py
+          grep -q 'WAYSGRAM_FIREBASE_CONFIG_JSON' .github/workflows/android-apk.yml
           grep -q 'longPollExecutor' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramApiClient.java
           grep -q 'apiClient.getLongPoll' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramChatFragment.java
           grep -q 'apiClient.getLongPoll' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java

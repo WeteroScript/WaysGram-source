@@ -45,6 +45,7 @@ The current Android overlay calls these API areas:
 - Profile and wallet: `GET /api/me`, `GET /api/me/wallet`.
 - User lookup: `GET /api/users?q=...`.
 - Contacts: `GET /api/contacts`, `POST /api/contacts`, and `DELETE /api/contacts/{user_id}`. Contacts are added manually from user search; phone-book synchronization is not implemented.
+- Block list: `GET /api/blocks`, `POST /api/blocks`, and `DELETE /api/blocks/{user_id}`. A block prevents either user from sending or forwarding direct messages to the other until unblocked.
 - Personal messages: `GET /api/messages` and `POST /api/messages`.
 - Forward a direct message into another conversation: `POST /api/messages/{message_id}/forward` with `recipient_id` and optional `Idempotency-Key`. The server requires access to the source conversation and stores the original message/user attribution.
 - Search within a personal conversation: `GET /api/messages/search?with={peer_id}&q={text}` (up to 100 matches, scoped to the authenticated conversation).

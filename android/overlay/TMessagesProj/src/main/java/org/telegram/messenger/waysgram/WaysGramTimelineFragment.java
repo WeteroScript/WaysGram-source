@@ -807,7 +807,7 @@ public final class WaysGramTimelineFragment extends BaseFragment {
         long messageId = message.optLong("id", 0);
         long repliedToId = message.optLong("reply_to_id", 0);
         String body = prefix + message.optString("body", "");
-        row.setText(repliedToId > 0 ? "Ответ на сообщение #" + repliedToId + "\\n" + body : body);
+        row.setText(repliedToId > 0 ? "Ответ на сообщение #" + repliedToId + "\n" + body : body);
         row.setContentDescription("Удерживайте сообщение, чтобы ответить");
         if (messageId > 0) {
             row.setOnLongClickListener(view -> {
@@ -950,7 +950,8 @@ public final class WaysGramTimelineFragment extends BaseFragment {
         apiClient.post(basePath(), payload, new WaysGramApiClient.Callback() {
             @Override
             public void onSuccess(JSONObject response) {
-                messageInput.setText("");                replyToMessageId = 0;
+                messageInput.setText("");
+                replyToMessageId = 0;
                 statusView.setOnClickListener(null);
                 setSendInFlight(false);
                 statusView.setText(type == TYPE_GROUP ? "Сообщение отправлено" : "Публикация создана");

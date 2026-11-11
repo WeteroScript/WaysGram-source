@@ -213,6 +213,33 @@ class SourcePreservationTests(unittest.TestCase):
         original = "import org.telegram.messenger.UserObject;\nclass GiftSheet {}\n"
         self.assertEqual(PATCHER.patch_source(original), original)
 
+    def test_gcm_service_routes_waysgram_push_and_keeps_telegram_registration(self) -> None:
+        original = (
+            "package org.telegram.messenger;\n"
+            "import com.google.firebase.messaging.FirebaseMessagingService;\n"
+            "class GcmPushListenerService extends FirebaseMessagingService {\n"
+            "    public void onMessageReceived(RemoteMessage message) {\n"
+            "        Map<String, String> data = message.getData();\n"
+            "        PushListenerController.processRemoteMessage("
+            "PushListenerController.PUSH_TYPE_FIREBASE, data.get(\"p\"), time);\n"
+            "    }\n"
+            "    public void onNewToken(String token) {\n"
+            "            PushListenerController.sendRegistrationToServer("
+            "PushListenerController.PUSH_TYPE_FIREBASE, token);\n"
+            "    }\n"
+            "}\n"
+        )
+        patched = PATCHER.patch_push_service_source(original)
+        self.assertIn('if ("1".equals(data.get("waysgram")))', patched)
+        self.assertIn("WaysGramPushNotifications.show(this, message);", patched)
+        self.assertIn("WaysGramPushManager.sync(this);", patched)
+        self.assertIn(
+            "PushListenerController.sendRegistrationToServer("
+            "PushListenerController.PUSH_TYPE_FIREBASE, token);",
+            patched,
+        )
+        self.assertEqual(PATCHER.patch_push_service_source(patched), patched)
+
     def test_launch_activity_source_is_unchanged(self) -> None:
         original = (
             "class LaunchActivity {\n"

@@ -45,6 +45,7 @@ The current Android overlay calls these API areas:
 - Profile and wallet: `GET /api/me`, `GET /api/me/wallet`.
 - User lookup: `GET /api/users?q=...`.
 - Personal messages: `GET /api/messages` and `POST /api/messages`.
+- Search within a personal conversation: `GET /api/messages/search?with={peer_id}&q={text}` (up to 100 matches, scoped to the authenticated conversation).
 - Groups: `GET /api/groups`, `POST /api/groups`, group history and text-post routes.
 - Channels: `GET /api/channels`, `POST /api/channels`, channel history and text-post routes.
 - Telegram gift catalogue and WaysGram storefront: `GET /api/telegram/gifts?all=1`.
@@ -55,7 +56,7 @@ The current Android overlay calls these API areas:
 - Document upload: `POST /api/media/documents` for PDF, TXT, and CSV.
 - Authenticated attachment download: `GET /api/media/{media_id}`.
 
-Direct messages and group/channel timelines support text, static image, and PDF/TXT/CSV attachments. Message history and send responses expose `media_id`, `media_type`, and `media_name` for attachments. Images render inline; documents are saved through Android's system document picker. The backend returns documents with `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff`.
+Direct messages support text, conversation-scoped message search, static image, and PDF/TXT/CSV attachments. Group/channel timelines support text, static image and PDF/TXT/CSV attachments. Message history and send responses expose `media_id`, `media_type`, and `media_name` for attachments. Images render inline; documents are saved through Android's system document picker. The backend returns documents with `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff`.
 
 Message rows expose a long-press action menu. Users can reply to a message using `reply_to_id`, edit their own message, or request deletion. The same UI pattern is available in direct chats, groups and channels. The backend validates the reply target and enforces author, membership, owner and administrator permissions for edits/deletions. Both `PATCH` and `PUT` are supported by the edit API; the Android client uses `PUT` for compatibility with `HttpURLConnection`. Direct-message rows display their timestamp and show whether the peer's read marker covers the message; the UI refreshes when that marker advances.
 
@@ -118,7 +119,7 @@ An empty caption becomes the server text label `Изображение`. The mes
 
 Files are stored in `waysgram_media` beside the configured SQLite database. Keep that directory on persistent storage and include it in backups; the Docker Compose `/data` volume covers both the database and media directory.
 
-The Android UI currently opens the system image picker and displays downloaded images in the message timeline. Videos, animated images and document attachments remain future work.
+The Android UI opens the system image picker and displays downloaded images in the message timeline. PDF, TXT and CSV documents use a separate upload/download path and Android's system document picker. Videos and animated images remain future work.
 
 ## Message refresh
 

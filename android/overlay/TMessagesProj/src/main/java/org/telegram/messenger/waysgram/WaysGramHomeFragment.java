@@ -54,6 +54,9 @@ public final class WaysGramHomeFragment extends BaseFragment {
         walletView = addLabel(context, content, "Баланс загружается…", 14, false);
         statusView = addLabel(context, content, "", 13, false);
 
+        addButton(context, content, "Контакты", () ->
+                presentFragment(new WaysGramDirectoryFragment(WaysGramDirectoryFragment.TYPE_CONTACTS), false)
+        );
         addButton(context, content, "Сообщения", () ->
                 presentFragment(new WaysGramDirectoryFragment(WaysGramDirectoryFragment.TYPE_CONVERSATIONS), false)
         );

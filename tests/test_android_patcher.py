@@ -104,6 +104,21 @@ class WaysGramDirectoryContractTests(unittest.TestCase):
         self.assertIn('recipient != peerId', chat_source)
 
 
+class WaysGramChatContractTests(unittest.TestCase):
+    def test_chat_blocks_duplicate_text_message_sends(self) -> None:
+        chat_path = (
+            ROOT
+            / "android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/"
+            / "WaysGramChatFragment.java"
+        )
+        source = chat_path.read_text(encoding="utf-8")
+        self.assertIn("private boolean messageSendInFlight = false", source)
+        self.assertIn("if (messageSendInFlight)", source)
+        self.assertIn("setMessageSendInFlight(true)", source)
+        self.assertIn("setMessageSendInFlight(false)", source)
+        self.assertIn("sendButton.setEnabled(!inFlight)", source)
+
+
 class SourcePreservationTests(unittest.TestCase):
     def test_gift_sheet_source_is_unchanged(self) -> None:
         original = "import org.telegram.messenger.UserObject;\nclass GiftSheet {}\n"

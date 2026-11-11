@@ -56,6 +56,24 @@ class WaysGramDirectoryContractTests(unittest.TestCase):
         self.assertIn('response.optString("invite_link", "")', source)
         self.assertIn("setPrimaryClip", source)
 
+    def test_channel_create_and_invite_join_block_duplicate_requests(self) -> None:
+        directory_path = (
+            ROOT
+            / "android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/"
+            / "WaysGramDirectoryFragment.java"
+        )
+        source = directory_path.read_text(encoding="utf-8")
+        self.assertIn("private boolean createRequestInFlight", source)
+        self.assertIn("private boolean joinRequestInFlight", source)
+        self.assertIn("if (createRequestInFlight)", source)
+        self.assertIn("if (joinRequestInFlight)", source)
+        self.assertIn("setCreateRequestInFlight(true)", source)
+        self.assertIn("setCreateRequestInFlight(false)", source)
+        self.assertIn("setJoinRequestInFlight(true)", source)
+        self.assertIn("setJoinRequestInFlight(false)", source)
+        self.assertIn("createDirectoryButton.setEnabled(!inFlight)", source)
+        self.assertIn("joinInviteButton.setEnabled(!inFlight)", source)
+
     def test_private_channel_visibility_accepts_numeric_json_flag(self) -> None:
         directory_path = (
             ROOT

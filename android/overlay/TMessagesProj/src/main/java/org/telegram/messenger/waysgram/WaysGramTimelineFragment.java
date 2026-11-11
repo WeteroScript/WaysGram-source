@@ -27,6 +27,9 @@ import org.telegram.messenger.AndroidUtilities;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
 
+import java.text.DateFormat;
+import java.util.Date;
+
 /** WaysGram group/channel text timeline backed by the private REST API. */
 public final class WaysGramTimelineFragment extends BaseFragment {
     private static final int REQUEST_ATTACHMENT = 7102;
@@ -735,6 +738,9 @@ public final class WaysGramTimelineFragment extends BaseFragment {
         managementStatusView.setText("Ваша роль: " + roleLabel(myRole) + " · участников: " + count);
         managementActionButton.setEnabled("owner".equals(myRole) || "admin".equals(myRole));
         managementList.removeAllViews();
+        if ("owner".equals(myRole) || "admin".equals(myRole)) {
+            addSmallButton(managementList, "Создать ссылку-приглашение", this::createGroupInvite);
+        }
         long myId = group.optLong("my_telegram_id", 0);
         if (!"owner".equals(myRole) && myId > 0) {
             addSmallButton(managementList, "Покинуть группу", () -> leaveGroup(myId));
@@ -814,6 +820,119 @@ public final class WaysGramTimelineFragment extends BaseFragment {
                 managementList.addView(actions, matchWrap());
             }
         }
+    }
+
+    private void createGroupInvite() {
+        EditText expiryInput = new EditText(getParentActivity());
+        expiryInput.setSingleLine(true);
+        expiryInput.setInputType(InputType.TYPE_CLASS_NUMBER);
+        expiryInput.setText("168");
+        expiryInput.setHint("Срок в часах");
+        EditText maxUsesInput = new EditText(getParentActivity());
+        maxUsesInput.setSingleLine(true);
+        maxUsesInput.setInputType(InputType.TYPE_CLASS_NUMBER);
+        maxUsesInput.setHint("Лимит вступлений (0 — без лимита)");
+
+        LinearLayout form = new LinearLayout(getParentActivity());
+        form.setOrientation(LinearLayout.VERTICAL);
+        int padding = AndroidUtilities.dp(20);
+        form.setPadding(padding, AndroidUtilities.dp(8), padding, 0);
+        form.addView(expiryInput, matchWrap());
+        form.addView(maxUsesInput, matchWrap());
+
+        new AlertDialog.Builder(getParentActivity())
+                .setTitle("Ссылка-приглашение")
+                .setMessage("Срок действия — от 1 часа до 365 дней. Лимит можно не задавать.")
+                .setView(form)
+                .setNegativeButton("Отмена", null)
+                .setPositiveButton("Создать", (dialog, which) -> {
+                    int expiryHours;
+                    int maxUses;
+                    try {
+                        expiryHours = Integer.parseInt(expiryInput.getText().toString().trim());
+                        String maxText = maxUsesInput.getText().toString().trim();
+                        maxUses = maxText.isEmpty() ? 0 : Integer.parseInt(maxText);
+                    } catch (Exception exception) {
+                        managementStatusView.setText("Укажите корректные числовые параметры приглашения.");
+                        return;
+                    }
+                    if (expiryHours < 1 || expiryHours > 24 * 365 || maxUses < 0 || maxUses > 10000) {
+                        managementStatusView.setText("Проверьте срок и лимит вступлений.");
+                        return;
+                    }
+                    JSONObject payload = new JSONObject();
+                    try {
+                        payload.put("expires_in_hours", expiryHours);
+                        if (maxUses > 0) {
+                            payload.put("max_uses", maxUses);
+                        }
+                    } catch (Exception exception) {
+                        managementStatusView.setText("Не удалось подготовить приглашение.");
+                        return;
+                    }
+                    managementStatusView.setText("Создаю ссылку-приглашение…");
+                    apiClient.post("/api/groups/" + targetId + "/invites", payload,
+                            new WaysGramApiClient.Callback() {
+                                @Override
+                                public void onSuccess(JSONObject response) {
+                                    String link = response.optString("invite_link", "");
+                                    if (link.isEmpty()) {
+                                        managementStatusView.setText("Сервер не вернул ссылку-приглашение.");
+                                        return;
+                                    }
+                                    String token = link.substring(link.lastIndexOf('/') + 1);
+                                    long expiresAt = response.optLong("expires_at", 0);
+                                    String details = "Ссылка создана"
+                                            + (expiresAt > 0 ? "\\nДействует до: " + DateFormat.getDateTimeInstance().format(new Date(expiresAt * 1000L)) : "");
+                                    managementStatusView.setText(details);
+                                    new AlertDialog.Builder(getParentActivity())
+                                            .setTitle("Приглашение в группу")
+                                            .setMessage(link + "\\n\\n" + details)
+                                            .setNegativeButton("Закрыть", null)
+                                            .setPositiveButton("Скопировать", (copyDialog, copyWhich) -> {
+                                                android.content.ClipboardManager clipboard =
+                                                        (android.content.ClipboardManager) getParentActivity()
+                                                                .getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+                                                if (clipboard != null) {
+                                                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText(
+                                                            "WaysGram group invite", link
+                                                    ));
+                                                    managementStatusView.setText("Ссылка скопирована.");
+                                                }
+                                            })
+                                            .setNeutralButton("Отозвать", (revokeDialog, revokeWhich) ->
+                                                    revokeGroupInvite(token))
+                                            .show();
+                                }
+
+                                @Override
+                                public void onError(String message, int statusCode) {
+                                    managementStatusView.setText(message);
+                                    loadManagement();
+                                }
+                            });
+                })
+                .show();
+    }
+
+    private void revokeGroupInvite(String token) {
+        if (token == null || !token.matches("[A-Za-z0-9_-]{20,128}")) {
+            managementStatusView.setText("Некорректный код приглашения.");
+            return;
+        }
+        apiClient.delete("/api/groups/" + targetId + "/invites/" + token,
+                new WaysGramApiClient.Callback() {
+                    @Override
+                    public void onSuccess(JSONObject response) {
+                        managementStatusView.setText("Ссылка-приглашение отозвана.");
+                        loadManagement();
+                    }
+
+                    @Override
+                    public void onError(String message, int statusCode) {
+                        managementStatusView.setText(message);
+                    }
+                });
     }
 
     private void addGroupMember() {

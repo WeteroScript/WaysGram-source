@@ -121,6 +121,10 @@ jobs:
           grep -q 'WaysGramDraftStore.save' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramChatFragment.java
           grep -q 'WaysGramDraftStore.load' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
           grep -q 'WaysGramDraftStore.save' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
+          grep -q 'Редактировать профиль' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramHomeFragment.java
+          grep -q 'apiClient.put("/api/me"' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramHomeFragment.java
+          grep -q 'apiClient.put("/api/me/avatar"' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramHomeFragment.java
+          grep -q 'REQUEST_AVATAR' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramHomeFragment.java
           grep -q 'reply_to_body' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramChatFragment.java
           grep -q 'reply_to_body' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
           grep -q 'MessageDigest.getInstance("SHA-256")' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramDraftStore.java

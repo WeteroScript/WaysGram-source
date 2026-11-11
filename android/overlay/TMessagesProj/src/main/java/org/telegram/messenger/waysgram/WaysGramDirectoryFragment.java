@@ -534,6 +534,16 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
             row.addView(open, new LinearLayout.LayoutParams(
                     0, ViewGroup.LayoutParams.WRAP_CONTENT, 1
             ));
+            if (type == TYPE_CONTACTS) {
+                Button profileButton = new Button(getParentActivity());
+                profileButton.setAllCaps(false);
+                profileButton.setText("Профиль");
+                row.addView(profileButton, new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
+                ));
+                profileButton.setOnClickListener(view ->
+                        presentFragment(new WaysGramUserProfileFragment(id), false));
+            }
             Button manage = new Button(getParentActivity());
             manage.setAllCaps(false);
             boolean searching = type == TYPE_CONTACTS

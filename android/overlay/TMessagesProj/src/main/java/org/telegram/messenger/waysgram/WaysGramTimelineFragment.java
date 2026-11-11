@@ -63,10 +63,17 @@ public final class WaysGramTimelineFragment extends BaseFragment {
     };
     private long lastMessageId = 0;
     private boolean pollInFlight = false;
+    private boolean eventPollInFlight = false;
     private boolean sendInFlight = false;
     private long lastMessageEventId = 0;
     private boolean messageEventsReady = false;
     private boolean messageEventsInitializing = false;
+    private final Runnable eventPollRetryRunnable = new Runnable() {
+        @Override
+        public void run() {
+            checkMessageEvents();
+        }
+    };
     private long replyToMessageId = 0;
     private boolean isScreenResumed = false;
     private String pendingSaveMediaId;
@@ -514,6 +521,7 @@ public final class WaysGramTimelineFragment extends BaseFragment {
                 loadMessages();
                 if (isScreenResumed) {
                     pollNewMessages();
+                    checkMessageEvents();
                 }
             }
 
@@ -534,50 +542,65 @@ public final class WaysGramTimelineFragment extends BaseFragment {
         });
     }
 
+    private void scheduleNextEventPoll(int delayMs) {
+        if (apiClient != null && isScreenResumed) {
+            pollHandler.removeCallbacks(eventPollRetryRunnable);
+            pollHandler.postDelayed(eventPollRetryRunnable, delayMs);
+        }
+    }
+
     private void checkMessageEvents() {
-        if (apiClient == null || !isScreenResumed) {
+        if (apiClient == null || !isScreenResumed || eventPollInFlight) {
             return;
         }
         if (!messageEventsReady) {
             initializeMessageEventCursor();
             return;
         }
-        apiClient.get("/api/events?after_id=" + lastMessageEventId, new WaysGramApiClient.Callback() {
-            @Override
-            public void onSuccess(JSONObject response) {
-                JSONArray events = response.optJSONArray("events");
-                String expectedScope = type == TYPE_GROUP ? "group" : "channel";
-                boolean refreshCurrentTimeline = false;
-                int count = events == null ? 0 : events.length();
-                for (int i = 0; i < count; i++) {
-                    JSONObject event = events.optJSONObject(i);
-                    if (event != null && expectedScope.equals(event.optString("scope"))
-                            && event.optLong("chat_id", 0) == targetId) {
-                        refreshCurrentTimeline = true;
-                        break;
+        eventPollInFlight = true;
+        apiClient.getEventLongPoll(
+                "/api/events?after_id=" + lastMessageEventId + "&wait_seconds=20",
+                new WaysGramApiClient.Callback() {
+                    @Override
+                    public void onSuccess(JSONObject response) {
+                        eventPollInFlight = false;
+                        if (!isScreenResumed) {
+                            return;
+                        }
+                        JSONArray events = response.optJSONArray("events");
+                        String expectedScope = type == TYPE_GROUP ? "group" : "channel";
+                        boolean refreshCurrentTimeline = false;
+                        int count = events == null ? 0 : events.length();
+                        for (int i = 0; i < count; i++) {
+                            JSONObject event = events.optJSONObject(i);
+                            if (event != null && expectedScope.equals(event.optString("scope"))
+                                    && event.optLong("chat_id", 0) == targetId) {
+                                refreshCurrentTimeline = true;
+                                break;
+                            }
+                        }
+                        lastMessageEventId = Math.max(
+                                lastMessageEventId,
+                                response.optLong("latest_id", lastMessageEventId)
+                        );
+                        if (refreshCurrentTimeline) {
+                            loadMessages();
+                        }
+                        checkMessageEvents();
+                    }
+
+                    @Override
+                    public void onError(String message, int statusCode) {
+                        eventPollInFlight = false;
+                        if (statusCode == 401) {
+                            WaysGramSessionStore.getInstance(getParentActivity()).clearSession();
+                            presentFragment(new WaysGramLoginFragment(), true);
+                        } else {
+                            scheduleNextEventPoll(4000);
+                        }
                     }
                 }
-                lastMessageEventId = Math.max(
-                        lastMessageEventId,
-                        response.optLong("latest_id", lastMessageEventId)
-                );
-                if (refreshCurrentTimeline) {
-                    loadMessages();
-                } else {
-                    scheduleNextPoll();
-                }
-            }
-
-            @Override
-            public void onError(String message, int statusCode) {
-                if (statusCode == 401) {
-                    WaysGramSessionStore.getInstance(getParentActivity()).clearSession();
-                    presentFragment(new WaysGramLoginFragment(), true);
-                } else {
-                    scheduleNextPoll(4000);
-                }
-            }
-        });
+        );
     }
 
     private void loadMessages() {
@@ -678,7 +701,7 @@ public final class WaysGramTimelineFragment extends BaseFragment {
                     statusView.setText("Новые сообщения: " + count);
                     markMessagesRead();
                 }
-                checkMessageEvents();
+                scheduleNextPoll();
             }
 
             @Override
@@ -1742,8 +1765,10 @@ public final class WaysGramTimelineFragment extends BaseFragment {
             typingIndicatorController.startPolling();
         }
         pollHandler.removeCallbacks(pollRunnable);
+        pollHandler.removeCallbacks(eventPollRetryRunnable);
         if (messageEventsReady) {
             pollNewMessages();
+            checkMessageEvents();
         } else {
             initializeMessageEventCursor();
         }
@@ -1753,6 +1778,7 @@ public final class WaysGramTimelineFragment extends BaseFragment {
     public void onPause() {
         isScreenResumed = false;
         pollHandler.removeCallbacks(pollRunnable);
+        pollHandler.removeCallbacks(eventPollRetryRunnable);
         if (typingIndicatorController != null) {
             typingIndicatorController.stopPolling();
         }

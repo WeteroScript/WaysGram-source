@@ -15,6 +15,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -740,6 +741,7 @@ public final class WaysGramTimelineFragment extends BaseFragment {
         managementList.removeAllViews();
         if ("owner".equals(myRole) || "admin".equals(myRole)) {
             addSmallButton(managementList, "Создать ссылку-приглашение", this::createGroupInvite);
+            addSmallButton(managementList, "Заявки на вступление", this::loadGroupJoinRequests);
         }
         long myId = group.optLong("my_telegram_id", 0);
         if (!"owner".equals(myRole) && myId > 0) {
@@ -832,6 +834,8 @@ public final class WaysGramTimelineFragment extends BaseFragment {
         maxUsesInput.setSingleLine(true);
         maxUsesInput.setInputType(InputType.TYPE_CLASS_NUMBER);
         maxUsesInput.setHint("Лимит вступлений (0 — без лимита)");
+        CheckBox requireApproval = new CheckBox(getParentActivity());
+        requireApproval.setText("Требовать одобрения администратора");
 
         LinearLayout form = new LinearLayout(getParentActivity());
         form.setOrientation(LinearLayout.VERTICAL);
@@ -839,6 +843,7 @@ public final class WaysGramTimelineFragment extends BaseFragment {
         form.setPadding(padding, AndroidUtilities.dp(8), padding, 0);
         form.addView(expiryInput, matchWrap());
         form.addView(maxUsesInput, matchWrap());
+        form.addView(requireApproval, matchWrap());
 
         new AlertDialog.Builder(getParentActivity())
                 .setTitle("Ссылка-приглашение")
@@ -863,6 +868,7 @@ public final class WaysGramTimelineFragment extends BaseFragment {
                     JSONObject payload = new JSONObject();
                     try {
                         payload.put("expires_in_hours", expiryHours);
+                        payload.put("require_approval", requireApproval.isChecked());
                         if (maxUses > 0) {
                             payload.put("max_uses", maxUses);
                         }
@@ -883,7 +889,8 @@ public final class WaysGramTimelineFragment extends BaseFragment {
                                     String token = link.substring(link.lastIndexOf('/') + 1);
                                     long expiresAt = response.optLong("expires_at", 0);
                                     String details = "Ссылка создана"
-                                            + (expiresAt > 0 ? "\nДействует до: " + DateFormat.getDateTimeInstance().format(new Date(expiresAt * 1000L)) : "");
+                                            + (expiresAt > 0 ? "\nДействует до: " + DateFormat.getDateTimeInstance().format(new Date(expiresAt * 1000L)) : "")
+                                            + (requireApproval.isChecked() ? "\nДля вступления потребуется одобрение администратора." : "");
                                     managementStatusView.setText(details);
                                     new AlertDialog.Builder(getParentActivity())
                                             .setTitle("Приглашение в группу")
@@ -913,6 +920,86 @@ public final class WaysGramTimelineFragment extends BaseFragment {
                             });
                 })
                 .show();
+    }
+
+    private void loadGroupJoinRequests() {
+        managementStatusView.setText("Загружаю заявки на вступление…");
+        apiClient.get("/api/groups/" + targetId + "/join-requests",
+                new WaysGramApiClient.Callback() {
+                    @Override
+                    public void onSuccess(JSONObject response) {
+                        JSONArray requests = response.optJSONArray("requests");
+                        int count = requests == null ? 0 : requests.length();
+                        if (count == 0) {
+                            managementStatusView.setText("Ожидающих заявок нет.");
+                            new AlertDialog.Builder(getParentActivity())
+                                    .setTitle("Заявки на вступление")
+                                    .setMessage("Новых заявок нет.")
+                                    .setPositiveButton("Закрыть", null)
+                                    .show();
+                            return;
+                        }
+                        String[] labels = new String[count];
+                        long[] userIds = new long[count];
+                        for (int i = 0; i < count; i++) {
+                            JSONObject item = requests.optJSONObject(i);
+                            if (item == null) {
+                                labels[i] = "Неизвестный пользователь";
+                                continue;
+                            }
+                            userIds[i] = item.optLong("telegram_id", 0);
+                            String name = item.optString("display_name", "").trim();
+                            String username = item.optString("username", "").trim();
+                            if (name.isEmpty()) {
+                                name = username.isEmpty() ? "Пользователь" : username;
+                            }
+                            labels[i] = name + (username.isEmpty() ? "" : " · @" + username)
+                                    + " · ID " + userIds[i];
+                        }
+                        managementStatusView.setText("Ожидающих заявок: " + count);
+                        new AlertDialog.Builder(getParentActivity())
+                                .setTitle("Заявки на вступление · " + count)
+                                .setItems(labels, (dialog, which) -> {
+                                    if (which < 0 || which >= userIds.length || userIds[which] <= 0) {
+                                        return;
+                                    }
+                                    long selectedId = userIds[which];
+                                    new AlertDialog.Builder(getParentActivity())
+                                            .setTitle("Заявка · " + selectedId)
+                                            .setItems(new String[]{"Одобрить", "Отклонить"}, (choiceDialog, choice) ->
+                                                    reviewGroupJoinRequest(selectedId, choice == 0))
+                                            .setNegativeButton("Закрыть", null)
+                                            .show();
+                                })
+                                .setPositiveButton("Закрыть", null)
+                                .show();
+                    }
+
+                    @Override
+                    public void onError(String message, int statusCode) {
+                        managementStatusView.setText(message);
+                    }
+                });
+    }
+
+    private void reviewGroupJoinRequest(long userId, boolean approve) {
+        String action = approve ? "approve" : "decline";
+        apiClient.post("/api/groups/" + targetId + "/join-requests/" + userId + "/" + action,
+                new JSONObject(), new WaysGramApiClient.Callback() {
+                    @Override
+                    public void onSuccess(JSONObject response) {
+                        managementStatusView.setText(approve
+                                ? "Заявка одобрена."
+                                : "Заявка отклонена.");
+                        loadManagement();
+                    }
+
+                    @Override
+                    public void onError(String message, int statusCode) {
+                        managementStatusView.setText(message);
+                        loadGroupJoinRequests();
+                    }
+                });
     }
 
     private void revokeGroupInvite(String token) {

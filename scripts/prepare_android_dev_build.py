@@ -7,8 +7,10 @@ launcher resources, permissions, and runtime behavior are left untouched.
 from __future__ import annotations
 
 import argparse
+import os
 import re
 from pathlib import Path
+from urllib.parse import urlsplit
 
 
 def replace_one(pattern: str, replacement: str, content: str, label: str) -> str:
@@ -48,6 +50,72 @@ def patch_string_resources(android_root: Path) -> None:
     if not found_app_name or not found_beta_name:
         raise ValueError("AppName/AppNameBeta resources were not found")
 
+
+
+def configure_default_api_base_url(android_root: Path) -> None:
+    value = os.getenv("WAYSGRAM_API_BASE_URL", "").strip().rstrip("/")
+    if not value:
+        return
+
+    parsed = urlsplit(value)
+    if (
+        parsed.scheme not in {"http", "https"}
+        or not parsed.netloc
+        or parsed.path not in {"", "/"}
+        or parsed.query
+        or parsed.fragment
+        or parsed.username
+        or parsed.password
+    ):
+        raise ValueError("WAYSGRAM_API_BASE_URL must be an absolute HTTP(S) origin")
+
+    login_sheet = (
+        android_root
+        / "TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramLoginSheet.java"
+    )
+    if not login_sheet.is_file():
+        raise FileNotFoundError(f"WaysGram login sheet not found: {login_sheet}")
+
+    content = login_sheet.read_text(encoding="utf-8")
+    content = replace_one(
+        r'^    private static final String DEFAULT_API_BASE_URL = .*;    if not (android_root / "gradlew").is_file():
+        raise FileNotFoundError(f"Android Gradle wrapper not found in {android_root}")
+
+    gradle_properties = android_root / "gradle.properties"
+    content = gradle_properties.read_text(encoding="utf-8")
+    content = replace_one(
+        r"^APP_PACKAGE=.*$",
+        "APP_PACKAGE=org.telegram.messenger",
+        content,
+        "Android application ID",
+    )
+    gradle_properties.write_text(content, encoding="utf-8")
+    configure_default_api_base_url(android_root)
+    patch_string_resources(android_root)
+
+    print(
+        "Configured WaysGram application label while retaining the upstream Firebase-compatible package. "
+        "Original Telegram UI, launcher icon, Google services, "
+        "and manifest declarations were preserved. WAYSGRAM_API_BASE_URL overrides the login API default when configured."
+        "permissions, and manifest declarations were preserved."
+    )
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--android-root", required=True, type=Path)
+    args = parser.parse_args()
+    configure_android_root(args.android_root)
+
+
+if __name__ == "__main__":
+    main()
+,
+        f"    private static final String DEFAULT_API_BASE_URL = {json.dumps(value)};",
+        content,
+        "WaysGram default API base URL",
+    )
+    login_sheet.write_text(content, encoding="utf-8")
 
 def configure_android_root(android_root: Path) -> None:
     if not (android_root / "gradlew").is_file():

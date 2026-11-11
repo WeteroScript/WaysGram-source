@@ -883,11 +883,11 @@ public final class WaysGramTimelineFragment extends BaseFragment {
                                     String token = link.substring(link.lastIndexOf('/') + 1);
                                     long expiresAt = response.optLong("expires_at", 0);
                                     String details = "Ссылка создана"
-                                            + (expiresAt > 0 ? "\\nДействует до: " + DateFormat.getDateTimeInstance().format(new Date(expiresAt * 1000L)) : "");
+                                            + (expiresAt > 0 ? "\nДействует до: " + DateFormat.getDateTimeInstance().format(new Date(expiresAt * 1000L)) : "");
                                     managementStatusView.setText(details);
                                     new AlertDialog.Builder(getParentActivity())
                                             .setTitle("Приглашение в группу")
-                                            .setMessage(link + "\\n\\n" + details)
+                                            .setMessage(link + "\n\n" + details)
                                             .setNegativeButton("Закрыть", null)
                                             .setPositiveButton("Скопировать", (copyDialog, copyWhich) -> {
                                                 android.content.ClipboardManager clipboard =

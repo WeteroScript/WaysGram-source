@@ -66,6 +66,11 @@ jobs:
           grep -q 'TYPE_BLOCKS' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramHomeFragment.java
           grep -q 'TYPE_BLOCKS' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramDirectoryFragment.java
           grep -q 'Редактировать профиль' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramHomeFragment.java
+          grep -q 'showAvatarActions' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramHomeFragment.java
+          grep -q 'apiClient.delete("/api/me/avatar"' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramHomeFragment.java
+          grep -q 'downloadImage(avatarId' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramHomeFragment.java
+          grep -q 'inventoryDialog' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramGiftCatalogSheet.java
+          grep -q 'dialog.isShowing()' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramGiftCatalogSheet.java
           grep -q 'apiClient.put("/api/me"' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramHomeFragment.java
           grep -q 'apiClient.put("/api/me/avatar"' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramHomeFragment.java
           grep -q 'REQUEST_AVATAR' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramHomeFragment.java

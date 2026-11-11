@@ -27,6 +27,9 @@ import org.telegram.messenger.AndroidUtilities;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
 
+import java.text.DateFormat;
+import java.util.Date;
+
 /** WaysGram-only home screen backed by AuthBot's REST API. */
 public final class WaysGramHomeFragment extends BaseFragment {
     private static final int REQUEST_AVATAR = 7106;
@@ -86,6 +89,7 @@ public final class WaysGramHomeFragment extends BaseFragment {
 
         addButton(context, content, "Редактировать профиль", this::showProfileEditor);
         addButton(context, content, "Фото профиля", this::showAvatarActions);
+        addButton(context, content, "Активные сеансы", this::showSessions);
         addButton(context, content, "Контакты", () ->
                 presentFragment(new WaysGramDirectoryFragment(WaysGramDirectoryFragment.TYPE_CONTACTS), false)
         );
@@ -376,6 +380,154 @@ public final class WaysGramHomeFragment extends BaseFragment {
             @Override
             public void onError(String message, int statusCode) {
                 statusView.setText(message);
+            }
+        });
+    }
+
+    private void showSessions() {
+        if (apiClient == null) {
+            return;
+        }
+        statusView.setText("Загружаю активные сеансы…");
+        apiClient.get("/api/auth/sessions", new WaysGramApiClient.Callback() {
+            @Override
+            public void onSuccess(JSONObject response) {
+                JSONArray sessions = response.optJSONArray("sessions");
+                int count = sessions == null ? 0 : sessions.length();
+                if (count == 0) {
+                    statusView.setText("Активных сеансов не найдено");
+                    new AlertDialog.Builder(getParentActivity())
+                            .setTitle("Активные сеансы")
+                            .setMessage("Список активных сеансов пуст.")
+                            .setPositiveButton("Закрыть", null)
+                            .show();
+                    return;
+                }
+                String[] labels = new String[count];
+                String[] sessionIds = new String[count];
+                boolean[] current = new boolean[count];
+                for (int i = 0; i < count; i++) {
+                    JSONObject item = sessions.optJSONObject(i);
+                    if (item == null) {
+                        labels[i] = "Неизвестный сеанс";
+                        sessionIds[i] = "";
+                        continue;
+                    }
+                    sessionIds[i] = item.optString("id", "");
+                    current[i] = item.optBoolean("is_current", false);
+                    long created = item.optLong("created_at", 0);
+                    long expires = item.optLong("expires_at", 0);
+                    StringBuilder label = new StringBuilder();
+                    label.append(current[i] ? "Текущий сеанс" : "Другой сеанс");
+                    if (created > 0) {
+                        label.append("\\nСоздан: ").append(formatSessionDate(created));
+                    }
+                    if (expires > 0) {
+                        label.append("\\nИстекает: ").append(formatSessionDate(expires));
+                    }
+                    if (current[i]) {
+                        label.append("\\nЭтот вход используется сейчас");
+                    } else {
+                        label.append("\\nНажмите, чтобы завершить");
+                    }
+                    labels[i] = label.toString();
+                }
+                statusView.setText("Активных сеансов: " + count);
+                new AlertDialog.Builder(getParentActivity())
+                        .setTitle("Активные сеансы")
+                        .setItems(labels, (dialog, which) -> {
+                            if (which < 0 || which >= sessionIds.length) {
+                                return;
+                            }
+                            if (current[which]) {
+                                Toast.makeText(getParentActivity(),
+                                        "Текущий сеанс нельзя завершить из этого списка.",
+                                        Toast.LENGTH_SHORT).show();
+                                return;
+                            }
+                            String sessionId = sessionIds[which];
+                            if (!sessionId.matches("[a-f0-9]{32}")) {
+                                statusView.setText("Сервер вернул некорректный ID сеанса.");
+                                return;
+                            }
+                            new AlertDialog.Builder(getParentActivity())
+                                    .setTitle("Завершить сеанс?")
+                                    .setMessage("Этот вход потеряет доступ к аккаунту WaysGram.")
+                                    .setNegativeButton("Отмена", null)
+                                    .setPositiveButton("Завершить", (confirm, selected) ->
+                                            revokeSession(sessionId))
+                                    .show();
+                        })
+                        .setNegativeButton("Закрыть", null)
+                        .setPositiveButton("Завершить остальные", (dialog, which) ->
+                                confirmRevokeOtherSessions())
+                        .show();
+            }
+
+            @Override
+            public void onError(String message, int statusCode) {
+                statusView.setText(message);
+                if (statusCode == 401) {
+                    sessionStore.clearSession();
+                    presentFragment(new WaysGramLoginFragment(), true);
+                }
+            }
+        });
+    }
+
+    private String formatSessionDate(long timestamp) {
+        return DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
+                .format(new Date(timestamp * 1000L));
+    }
+
+    private void confirmRevokeOtherSessions() {
+        new AlertDialog.Builder(getParentActivity())
+                .setTitle("Завершить остальные сеансы?")
+                .setMessage("Все остальные входы будут отключены. Текущий сеанс останется активным.")
+                .setNegativeButton("Отмена", null)
+                .setPositiveButton("Завершить", (dialog, which) -> {
+                    statusView.setText("Завершаю остальные сеансы…");
+                    apiClient.post("/api/auth/sessions/revoke-others", new JSONObject(),
+                            new WaysGramApiClient.Callback() {
+                                @Override
+                                public void onSuccess(JSONObject response) {
+                                    int revoked = response.optInt("revoked_sessions", 0);
+                                    statusView.setText("Завершено сеансов: " + revoked);
+                                    Toast.makeText(getParentActivity(),
+                                            "Остальные сеансы завершены: " + revoked,
+                                            Toast.LENGTH_SHORT).show();
+                                    showSessions();
+                                }
+
+                                @Override
+                                public void onError(String message, int statusCode) {
+                                    statusView.setText(message);
+                                    if (statusCode == 401) {
+                                        sessionStore.clearSession();
+                                        presentFragment(new WaysGramLoginFragment(), true);
+                                    }
+                                }
+                            });
+                })
+                .show();
+    }
+
+    private void revokeSession(String sessionId) {
+        statusView.setText("Завершаю сеанс…");
+        apiClient.delete("/api/auth/sessions/" + sessionId, new WaysGramApiClient.Callback() {
+            @Override
+            public void onSuccess(JSONObject response) {
+                statusView.setText("Сеанс завершён");
+                showSessions();
+            }
+
+            @Override
+            public void onError(String message, int statusCode) {
+                statusView.setText(message);
+                if (statusCode == 401) {
+                    sessionStore.clearSession();
+                    presentFragment(new WaysGramLoginFragment(), true);
+                }
             }
         });
     }

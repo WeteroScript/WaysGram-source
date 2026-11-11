@@ -251,8 +251,8 @@ public final class WaysGramGiftCatalogClient implements AutoCloseable {
     private JSONObject requestJson(
             String url,
             String method,
-            @Nullable String requestBody,
-            @Nullable String idempotencyKey
+            String requestBody,
+            String idempotencyKey
     ) throws IOException {
         byte[] body = requestBytes(url, MAX_JSON_BYTES, method, requestBody, idempotencyKey);
         try {
@@ -270,8 +270,8 @@ public final class WaysGramGiftCatalogClient implements AutoCloseable {
             String url,
             int maxBytes,
             String method,
-            @Nullable String requestBody,
-            @Nullable String idempotencyKey
+            String requestBody,
+            String idempotencyKey
     ) throws IOException {
         String token = sessionProvider.getWaysGramSessionToken();
         if (token == null || token.trim().length() == 0) {

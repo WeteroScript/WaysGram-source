@@ -52,7 +52,7 @@ jobs:
       - name: Configure an isolated WaysGram development identity
         env:
           WAYSGRAM_API_BASE_URL: ${{ secrets.WAYSGRAM_API_BASE_URL }}
-          WAYSGRAM_FIREBASE_CONFIG_JSON: ${{ secrets.WAYSGRAM_FIREBASE_CONFIG_JSON }}
+          FIREBASE_CONFIG: ${{ secrets.FIREBASE_CONFIG }}
           WAYSGRAM_REQUIRE_FIREBASE_CONFIG: "1"
         run: python3 scripts/prepare_android_dev_build.py --android-root android/telegram-upstream
 
@@ -71,7 +71,7 @@ jobs:
         run: |
           APK="$(find TMessagesProj_App/build/outputs/apk -type f -path '*/afat/debug/*.apk' -print -quit)"
           test -n "$APK"
-          "$ANDROID_SDK_ROOT/build-tools/36.0.0/aapt" dump badging "$APK" | grep -F "package: name='org.telegram.messenger.beta'"
+          "$ANDROID_SDK_ROOT/build-tools/36.0.0/aapt" dump badging "$APK" | grep -F "package: name='org.waysgram.messenger'"
           "$ANDROID_SDK_ROOT/build-tools/36.0.0/apksigner" verify "$APK"
           mkdir -p "$GITHUB_WORKSPACE/dist"
           cp "$APK" "$GITHUB_WORKSPACE/dist/WaysGram-dev.apk"

@@ -38,6 +38,7 @@ jobs:
         run: |
           for source in \
             WaysGramSessionStore.java \
+            WaysGramTelemetry.java \
             WaysGramAuthClient.java \
             WaysGramApiClient.java \
             WaysGramLoginSheet.java \
@@ -56,6 +57,9 @@ jobs:
           grep -q 'patch_launch_source' scripts/apply-android-patches.py
           grep -q 'GET /api/telegram/gifts' docs/ANDROID_API_CONTRACT.md
           grep -q 'AuthWaysGram_bot' README.md
+          grep -q 'WaysGramTelemetry.initialize' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramSessionStore.java
+          grep -q 'PostHog.capture' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTelemetry.java
+          grep -q 'com.posthog:posthog-android:3.+' scripts/prepare_android_dev_build.py
           grep -q 'https://bot-1793554244-6434-weterochina.bothost.tech' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramLoginSheet.java
           grep -q 'Для публичного канала укажите username' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramDirectoryFragment.java
           grep -q 'InputFilter.LengthFilter(6)' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramLoginSheet.java

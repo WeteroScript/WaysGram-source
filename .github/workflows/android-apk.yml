@@ -1,7 +1,10 @@
 name: WaysGram Android debug APK
 
 on:
-  # APK builds are manual-only. Source changes must not start a build implicitly.
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/android-apk.yml"
   workflow_dispatch:
 
 permissions:
@@ -13,6 +16,8 @@ concurrency:
 
 jobs:
   build-debug-apk:
+    # A push-triggered run only acquires the concurrency lock to stop an older APK job.
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:

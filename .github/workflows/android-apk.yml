@@ -52,6 +52,8 @@ jobs:
       - name: Configure an isolated WaysGram development identity
         env:
           WAYSGRAM_API_BASE_URL: ${{ secrets.WAYSGRAM_API_BASE_URL }}
+          WAYSGRAM_FIREBASE_CONFIG_JSON: ${{ secrets.WAYSGRAM_FIREBASE_CONFIG_JSON }}
+          WAYSGRAM_REQUIRE_FIREBASE_CONFIG: "1"
         run: python3 scripts/prepare_android_dev_build.py --android-root android/telegram-upstream
 
       - name: Build universal debug APK

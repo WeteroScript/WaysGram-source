@@ -51,6 +51,7 @@ public final class WaysGramGiftCatalogSheet extends BottomSheet {
     private TextView statusView;
     private ProgressBar progressBar;
     private final Set<String> purchasingGiftIds = new HashSet<>();
+    private AlertDialog inventoryDialog;
 
     public WaysGramGiftCatalogSheet(
             Context context,
@@ -77,7 +78,13 @@ public final class WaysGramGiftCatalogSheet extends BottomSheet {
         setApplyBottomPadding(true);
         setCustomView(createContent(context));
 
-        setOnDismissListener(dialog -> catalogClient.close());
+        setOnDismissListener(dialog -> {
+            if (inventoryDialog != null && inventoryDialog.isShowing()) {
+                inventoryDialog.dismiss();
+            }
+            inventoryDialog = null;
+            catalogClient.close();
+        });
         loadCatalog();
     }
 
@@ -152,11 +159,20 @@ public final class WaysGramGiftCatalogSheet extends BottomSheet {
     }
 
     private void showMyGifts() {
+        if (inventoryDialog != null && inventoryDialog.isShowing()) {
+            inventoryDialog.dismiss();
+        }
         AlertDialog dialog = new AlertDialog.Builder(getContext())
                 .setTitle("Мои подарки")
                 .setMessage("Загружаю инвентарь…")
                 .setPositiveButton("Закрыть", null)
                 .create();
+        inventoryDialog = dialog;
+        dialog.setOnDismissListener(ignored -> {
+            if (inventoryDialog == dialog) {
+                inventoryDialog = null;
+            }
+        });
         dialog.show();
         catalogClient.loadMyGifts(new WaysGramGiftCatalogClient.InventoryCallback() {
             @Override

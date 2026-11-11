@@ -72,6 +72,7 @@ public final class WaysGramApiClient implements AutoCloseable {
 
     private final WaysGramSessionStore sessionStore;
     private final ExecutorService ioExecutor;
+    private final ExecutorService longPollExecutor;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     public WaysGramApiClient(WaysGramSessionStore sessionStore) {
@@ -84,10 +85,32 @@ public final class WaysGramApiClient implements AutoCloseable {
             thread.setDaemon(true);
             return thread;
         });
+        longPollExecutor = Executors.newSingleThreadExecutor(runnable -> {
+            Thread thread = new Thread(runnable, "WaysGramLongPoll");
+            thread.setDaemon(true);
+            return thread;
+        });
     }
 
     public void get(String path, Callback callback) {
         execute("GET", path, null, callback);
+    }
+
+    /**
+     * Runs a bounded long-poll request away from the normal API queue so sends,
+     * uploads and draft synchronization are not blocked while the server waits.
+     */
+    public void getLongPoll(String path, Callback callback) {
+        longPollExecutor.execute(() -> {
+            try {
+                JSONObject response = request("GET", path, null);
+                deliverSuccess(callback, response);
+            } catch (ApiException exception) {
+                deliverError(callback, exception.getMessage(), exception.statusCode);
+            } catch (Exception exception) {
+                deliverError(callback, "Не удалось получить обновления WaysGram", 0);
+            }
+        });
     }
 
     public void post(String path, JSONObject payload, Callback callback) {
@@ -568,6 +591,7 @@ public final class WaysGramApiClient implements AutoCloseable {
     @Override
     public void close() {
         ioExecutor.shutdown();
+        longPollExecutor.shutdown();
     }
 
     private static final class ApiException extends IOException {

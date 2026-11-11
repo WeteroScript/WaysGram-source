@@ -40,11 +40,13 @@ public final class WaysGramTimelineFragment extends BaseFragment {
 
     private WaysGramApiClient apiClient;
     private WaysGramCloudDraftSync cloudDraftSync;
+    private WaysGramTypingIndicatorController typingIndicatorController;
     private LinearLayout messagesContainer;
     private LinearLayout managementList;
     private EditText messageInput;
     private EditText managementInput;
     private TextView statusView;
+    private TextView typingView;
     private TextView managementStatusView;
     private Button sendButton;
     private Button attachButton;
@@ -98,6 +100,17 @@ public final class WaysGramTimelineFragment extends BaseFragment {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
         ));
+        if (type == TYPE_GROUP) {
+            typingView = new TextView(context);
+            typingView.setTextSize(12);
+            typingView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
+            typingView.setVisibility(View.GONE);
+            root.addView(typingView, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+            ));
+        }
+
 
         buildManagementPanel(context, root);
 
@@ -132,6 +145,11 @@ public final class WaysGramTimelineFragment extends BaseFragment {
                 context, apiClient, draftScope, targetId, messageInput
         );
         cloudDraftSync.start();
+        if (type == TYPE_GROUP) {
+            typingIndicatorController = new WaysGramTypingIndicatorController(
+                    apiClient, "group", targetId, messageInput, typingView
+            );
+        }
         attachButton = new Button(context);
         attachButton.setText("Файл");
         attachButton.setAllCaps(false);
@@ -1308,6 +1326,9 @@ public final class WaysGramTimelineFragment extends BaseFragment {
     public void onResume() {
         super.onResume();
         isScreenResumed = true;
+        if (typingIndicatorController != null) {
+            typingIndicatorController.startPolling();
+        }
         pollHandler.removeCallbacks(pollRunnable);
         if (messageEventsReady) {
             pollNewMessages();
@@ -1320,6 +1341,9 @@ public final class WaysGramTimelineFragment extends BaseFragment {
     public void onPause() {
         isScreenResumed = false;
         pollHandler.removeCallbacks(pollRunnable);
+        if (typingIndicatorController != null) {
+            typingIndicatorController.stopPolling();
+        }
         if (cloudDraftSync != null) {
             cloudDraftSync.flush();
         }
@@ -1330,6 +1354,10 @@ public final class WaysGramTimelineFragment extends BaseFragment {
     public void onFragmentDestroy() {
         isScreenResumed = false;
         pollHandler.removeCallbacks(pollRunnable);
+        if (typingIndicatorController != null) {
+            typingIndicatorController.close();
+            typingIndicatorController = null;
+        }
         if (cloudDraftSync != null) {
             cloudDraftSync.close();
             cloudDraftSync = null;

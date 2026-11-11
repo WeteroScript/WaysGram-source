@@ -380,7 +380,7 @@ public final class WaysGramGiftCatalogClient implements AutoCloseable {
                 && exception.getMessage().startsWith("WaysGram")) {
             return exception.getMessage();
         }
-        return "Не удалось загрузить каталог подарков WaysGram";
+        return "Не удалось выполнить запрос к магазину подарков WaysGram";
     }
 
     @Override

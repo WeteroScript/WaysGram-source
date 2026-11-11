@@ -53,6 +53,11 @@ public final class WaysGramGiftCatalogClient implements AutoCloseable {
         void onError(String message);
     }
 
+    public interface InventoryCallback {
+        void onLoaded(JSONArray gifts);
+        void onError(String message);
+    }
+
     public static final class Gift {
         public final String id;
         public final String title;
@@ -192,6 +197,21 @@ public final class WaysGramGiftCatalogClient implements AutoCloseable {
                         response.optBoolean("stale", false),
                         response.optLong("synced_at", 0L)
                 );
+            } catch (Exception exception) {
+                callback.onError(toSafeError(exception));
+            }
+        });
+    }
+
+    public void loadMyGifts(InventoryCallback callback) {
+        if (callback == null) {
+            return;
+        }
+        ioExecutor.execute(() -> {
+            try {
+                JSONObject response = requestJson(getBaseUrl() + "/api/me/gifts");
+                JSONArray gifts = response.optJSONArray("gifts");
+                callback.onLoaded(gifts == null ? new JSONArray() : gifts);
             } catch (Exception exception) {
                 callback.onError(toSafeError(exception));
             }

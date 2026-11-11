@@ -436,6 +436,8 @@ public final class WaysGramHomeFragment extends BaseFragment {
     @Override
     public void onResume() {
         super.onResume();
+        WaysGramPushManager.sync(getParentActivity());
+        WaysGramPushManager.requestNotificationPermission(getParentActivity());
         isScreenResumed = true;
         loadUnreadSummary();
         eventHandler.removeCallbacks(eventRetryRunnable);

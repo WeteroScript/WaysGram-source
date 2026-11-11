@@ -59,6 +59,7 @@ jobs:
         env:
           POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
           POSTHOG_HOST: ${{ vars.POSTHOG_HOST || 'https://eu.i.posthog.com' }}
+          WAYSGRAM_API_BASE_URL: ${{ secrets.WAYSGRAM_API_BASE_URL }}
         run: python3 scripts/prepare_android_dev_build.py --android-root android/telegram-upstream
 
       - name: Build universal debug APK

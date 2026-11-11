@@ -23,7 +23,7 @@ class AndroidDevBuildConfigurationTests(unittest.TestCase):
             encoding="utf-8",
         )
         (root / "TMessagesProj/build.gradle").write_text(
-            "dependencies {\\n}\\n\\nandroid {\\n    defaultConfig {\\n        minSdkVersion 23\\n    }\\n}\\n",
+            "dependencies {\n}\n\nandroid {\n    defaultConfig {\n        minSdkVersion 23\n    }\n}\n",
             encoding="utf-8",
         )
         (root / "TMessagesProj_App").mkdir()

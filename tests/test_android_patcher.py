@@ -56,6 +56,18 @@ class WaysGramDirectoryContractTests(unittest.TestCase):
         self.assertIn('response.optString("invite_link", "")', source)
         self.assertIn("setPrimaryClip", source)
 
+    def test_private_channel_visibility_accepts_numeric_json_flag(self) -> None:
+        directory_path = (
+            ROOT
+            / "android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/"
+            / "WaysGramDirectoryFragment.java"
+        )
+        source = directory_path.read_text(encoding="utf-8")
+        self.assertIn("private static boolean isPublicChannel(JSONObject item)", source)
+        self.assertIn("value instanceof Number", source)
+        self.assertIn("((Number) value).intValue() != 0", source)
+        self.assertIn("if (isPublicChannel(item))", source)
+
     def test_saved_messages_open_the_current_users_own_chat(self) -> None:
         directory_path = (
             ROOT

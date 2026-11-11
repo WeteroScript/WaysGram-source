@@ -46,6 +46,7 @@ The current Android overlay calls these API areas:
 
 - Authentication sessions: `GET /api/auth/sessions` lists the current user's active WaysGram sessions; `DELETE /api/auth/sessions/{session_id}` revokes one session; `POST /api/auth/sessions/revoke-others` revokes every other session while preserving the current one. Responses expose opaque session IDs and timestamps only, never session tokens or token hashes.
 - Profile and wallet: `GET /api/me`, `PUT /api/me`, `GET /api/me/wallet`.
+- Public profiles and their gift display: `GET /api/users/{user_id}` returns profile fields plus up to 50 most recently acquired gifts in `gifts` (serial number, source gift ID, title and acquisition time). The response does not expose the account phone number, balance or session credentials.
 - Profile avatar: `POST /api/media/images`, `PUT /api/me/avatar`, and `DELETE /api/me/avatar`. AuthBot validates profile fields and enforces username uniqueness.
 - User lookup: `GET /api/users?q=...`.
 - Contacts: `GET /api/contacts`, `POST /api/contacts`, and `DELETE /api/contacts/{user_id}`. Contacts are added manually from user search; phone-book synchronization is not implemented.

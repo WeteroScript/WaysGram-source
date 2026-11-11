@@ -67,7 +67,7 @@ public final class WaysGramHomeFragment extends BaseFragment {
                 presentFragment(new WaysGramBotsFragment(), false)
         );
         addButton(context, content, "Подарки Telegram", () ->
-                new WaysGramGiftCatalogSheet(context, sessionStore, resourceProvider).show()
+                new WaysGramGiftCatalogSheet(context, sessionStore, resourceProvider, this::loadProfile).show()
         );
         addButton(context, content, "Обновить профиль и баланс", this::loadProfile);
         addButton(context, content, "Выйти из WaysGram", this::logout);

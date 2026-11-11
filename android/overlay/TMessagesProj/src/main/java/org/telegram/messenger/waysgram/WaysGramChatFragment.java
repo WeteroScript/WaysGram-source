@@ -647,6 +647,17 @@ public final class WaysGramChatFragment extends BaseFragment {
         if (!reactionSummary.isEmpty()) {
             displayText += "\n" + reactionSummary.replace(",", " · ").replace(":", " ");
         }
+        JSONArray myReactions = message.optJSONArray("my_reactions");
+        if (myReactions != null && myReactions.length() > 0) {
+            StringBuilder mine = new StringBuilder("\nВаша реакция: ");
+            for (int i = 0; i < myReactions.length(); i++) {
+                if (i > 0) {
+                    mine.append(" · ");
+                }
+                mine.append(myReactions.optString(i));
+            }
+            displayText += mine.toString();
+        }
         row.setText(displayText);
         row.setContentDescription("Удерживайте сообщение, чтобы ответить или поставить реакцию");
         if (messageId > 0) {

@@ -58,6 +58,16 @@ public final class WaysGramGiftCatalogClient implements AutoCloseable {
         void onError(String message);
     }
 
+    public interface MarketCallback {
+        void onLoaded(JSONArray listings);
+        void onError(String message);
+    }
+
+    public interface ActionCallback {
+        void onComplete(JSONObject result);
+        void onError(String message);
+    }
+
     public static final class Gift {
         public final String id;
         public final String title;
@@ -249,6 +259,79 @@ public final class WaysGramGiftCatalogClient implements AutoCloseable {
                 callback.onError(toSafeError(exception));
             }
         });
+    }
+
+    public void loadMarket(MarketCallback callback) {
+        if (callback == null) {
+            return;
+        }
+        ioExecutor.execute(() -> {
+            try {
+                JSONObject response = requestJson(getBaseUrl() + "/api/gift-market");
+                JSONArray listings = response.optJSONArray("listings");
+                callback.onLoaded(listings == null ? new JSONArray() : listings);
+            } catch (Exception exception) {
+                callback.onError(toSafeError(exception));
+            }
+        });
+    }
+
+    public void listGift(String serial, int priceGrams, ActionCallback callback) {
+        runGiftAction("/api/gifts/" + encodePathSegment(serial) + "/list", "POST",
+                jsonBody("price_grams", priceGrams), callback);
+    }
+
+    public void cancelGiftListing(String serial, ActionCallback callback) {
+        runGiftAction("/api/gifts/" + encodePathSegment(serial) + "/list", "DELETE", null, callback);
+    }
+
+    public void upgradeGift(String serial, ActionCallback callback) {
+        runGiftAction("/api/gifts/" + encodePathSegment(serial) + "/upgrade", "POST", "{}", callback);
+    }
+
+    public void transferGift(String serial, String recipient, ActionCallback callback) {
+        JSONObject body = new JSONObject();
+        try {
+            body.put("serial_number", serial);
+            body.put("recipient", recipient);
+        } catch (Exception ignored) {
+        }
+        runGiftAction("/api/gifts/transfer", "POST", body.toString(), callback);
+    }
+
+    public void purchaseMarketGift(int listingId, ActionCallback callback) {
+        runGiftAction("/api/gift-market/" + listingId + "/purchase", "POST", "{}", callback);
+    }
+
+    private void runGiftAction(String path, String method, String body, ActionCallback callback) {
+        if (callback == null) {
+            return;
+        }
+        ioExecutor.execute(() -> {
+            try {
+                JSONObject response = requestJson(getBaseUrl() + path, method, body, null);
+                callback.onComplete(response);
+            } catch (Exception exception) {
+                callback.onError(toSafeError(exception));
+            }
+        });
+    }
+
+    private static String jsonBody(String key, int value) {
+        JSONObject body = new JSONObject();
+        try {
+            body.put(key, value);
+        } catch (Exception ignored) {
+        }
+        return body.toString();
+    }
+
+    private static String encodePathSegment(String value) {
+        try {
+            return URLEncoder.encode(value == null ? "" : value, "UTF-8").replace("+", "%20");
+        } catch (Exception ignored) {
+            return "";
+        }
     }
 
     /**

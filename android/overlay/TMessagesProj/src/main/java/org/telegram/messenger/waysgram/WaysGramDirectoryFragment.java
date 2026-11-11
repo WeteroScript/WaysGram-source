@@ -182,10 +182,12 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
         ));
         createDirectoryButton.setOnClickListener(view -> createDirectoryItem());
 
-        if (type == TYPE_CHANNELS) {
+        if (type == TYPE_CHANNELS || type == TYPE_GROUPS) {
             inviteInput = new EditText(context);
             inviteInput.setSingleLine(true);
-            inviteInput.setHint("Ссылка или код приглашения");
+            inviteInput.setHint(type == TYPE_GROUPS
+                    ? "Ссылка или код приглашения в группу"
+                    : "Ссылка или код приглашения в канал");
             root.addView(inviteInput, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT
@@ -197,7 +199,13 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT
             ));
-            joinInviteButton.setOnClickListener(view -> joinChannelByInvite());
+            joinInviteButton.setOnClickListener(view -> {
+                if (type == TYPE_GROUPS) {
+                    joinGroupByInvite();
+                } else {
+                    joinChannelByInvite();
+                }
+            });
         }
     }
 
@@ -359,6 +367,45 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
             @Override
             public void onError(String message, int statusCode) {
                 setCreateRequestInFlight(false);
+                statusView.setText(message);
+            }
+        });
+    }
+
+    private void joinGroupByInvite() {
+        if (joinRequestInFlight) {
+            return;
+        }
+        String inviteValue = inviteInput == null || inviteInput.getText() == null
+                ? ""
+                : inviteInput.getText().toString().trim();
+        if (inviteValue.isEmpty()) {
+            statusView.setText("Вставьте ссылку или код приглашения в группу.");
+            return;
+        }
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("invite_link", inviteValue);
+        } catch (Exception exception) {
+            statusView.setText("Не удалось подготовить приглашение.");
+            return;
+        }
+        statusView.setText("Проверяю приглашение в группу…");
+        setJoinRequestInFlight(true);
+        apiClient.post("/api/groups/join", payload, new WaysGramApiClient.Callback() {
+            @Override
+            public void onSuccess(JSONObject response) {
+                setJoinRequestInFlight(false);
+                inviteInput.setText("");
+                statusView.setText(response.optBoolean("already_member", false)
+                        ? "Вы уже состоите в группе: " + response.optString("title", "Группа")
+                        : "Вы вступили в группу: " + response.optString("title", "Группа"));
+                loadItems();
+            }
+
+            @Override
+            public void onError(String message, int statusCode) {
+                setJoinRequestInFlight(false);
                 statusView.setText(message);
             }
         });

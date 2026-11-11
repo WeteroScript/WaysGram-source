@@ -911,7 +911,18 @@ public final class WaysGramTimelineFragment extends BaseFragment {
         long messageId = message.optLong("id", 0);
         long repliedToId = message.optLong("reply_to_id", 0);
         String body = prefix + message.optString("body", "");
-        row.setText(repliedToId > 0 ? "Ответ на сообщение #" + repliedToId + "\n" + body : body);
+        if (repliedToId > 0) {
+            String quotedBody = message.optString("reply_to_body", "").trim();
+            long quotedSender = message.optLong("reply_to_sender_id", 0);
+            if (quotedBody.length() > 160) {
+                quotedBody = quotedBody.substring(0, 160) + "…";
+            }
+            String quotePreview = quotedBody.isEmpty()
+                    ? "Сообщение #" + repliedToId
+                    : (quotedSender > 0 ? "@" + quotedSender + ": " : "") + quotedBody;
+            body = "Цитата: " + quotePreview + "\n" + body;
+        }
+        row.setText(body);
         row.setContentDescription("Удерживайте сообщение, чтобы ответить");
         if (messageId > 0) {
             row.setOnLongClickListener(view -> {

@@ -146,4 +146,4 @@ The AuthBot service requires its own environment configuration, including `BOT_T
 
 The host must run the FastAPI/Aiogram service and preserve the API paths expected above. Validate `GET /health`, authentication, profile, message, group, channel and sticker-proxy routes against the actual deployment before calling the integration operational.
 
-No APK build is part of this source-only stage.
+The repository includes a GitHub Actions workflow for a universal debug APK. Treat an APK as available only after the workflow completes successfully and the artifact is present; source-check success alone does not establish that an APK was built.

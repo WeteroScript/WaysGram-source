@@ -43,10 +43,12 @@ public final class WaysGramChatFragment extends BaseFragment {
 
     private WaysGramApiClient apiClient;
     private WaysGramCloudDraftSync cloudDraftSync;
+    private WaysGramTypingIndicatorController typingIndicatorController;
     private LinearLayout messagesContainer;
     private EditText messageInput;
     private Button sendButton;
     private TextView statusView;
+    private TextView typingView;
     private boolean messageSendInFlight = false;
     private long replyToMessageId = 0;
     private final Handler pollHandler = new Handler(Looper.getMainLooper());
@@ -98,6 +100,15 @@ public final class WaysGramChatFragment extends BaseFragment {
                 ViewGroup.LayoutParams.WRAP_CONTENT
         ));
 
+        typingView = new TextView(context);
+        typingView.setTextSize(12);
+        typingView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
+        typingView.setVisibility(View.GONE);
+        root.addView(typingView, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+
         ScrollView scroll = new ScrollView(context);
         messagesContainer = new LinearLayout(context);
         messagesContainer.setOrientation(LinearLayout.VERTICAL);
@@ -121,6 +132,9 @@ public final class WaysGramChatFragment extends BaseFragment {
         messageInput.setText(WaysGramDraftStore.load(context, "dm", peerId));
         cloudDraftSync = new WaysGramCloudDraftSync(context, apiClient, "dm", peerId, messageInput);
         cloudDraftSync.start();
+        typingIndicatorController = new WaysGramTypingIndicatorController(
+                apiClient, "dm", peerId, messageInput, typingView
+        );
         composer.addView(messageInput, new LinearLayout.LayoutParams(
                 0,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -1003,6 +1017,9 @@ public final class WaysGramChatFragment extends BaseFragment {
     public void onResume() {
         super.onResume();
         isScreenResumed = true;
+        if (typingIndicatorController != null) {
+            typingIndicatorController.startPolling();
+        }
         pollHandler.removeCallbacks(pollRunnable);
         if (messageEventsReady) {
             pollNewMessages();
@@ -1015,6 +1032,9 @@ public final class WaysGramChatFragment extends BaseFragment {
     public void onPause() {
         isScreenResumed = false;
         pollHandler.removeCallbacks(pollRunnable);
+        if (typingIndicatorController != null) {
+            typingIndicatorController.stopPolling();
+        }
         if (cloudDraftSync != null) {
             cloudDraftSync.flush();
         }
@@ -1025,6 +1045,10 @@ public final class WaysGramChatFragment extends BaseFragment {
     public void onFragmentDestroy() {
         isScreenResumed = false;
         pollHandler.removeCallbacks(pollRunnable);
+        if (typingIndicatorController != null) {
+            typingIndicatorController.close();
+            typingIndicatorController = null;
+        }
         if (cloudDraftSync != null) {
             cloudDraftSync.close();
             cloudDraftSync = null;

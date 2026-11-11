@@ -47,6 +47,7 @@ jobs:
             WaysGramChatFragment.java \
             WaysGramTimelineFragment.java \
             WaysGramCloudDraftSync.java \
+            WaysGramTypingIndicatorController.java \
             WaysGramGiftCatalogClient.java \
             WaysGramGiftCatalogSheet.java \
             WaysGramBotsFragment.java \
@@ -146,6 +147,15 @@ jobs:
           grep -q 'SAVE_DELAY_MS = 750L' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramCloudDraftSync.java
           grep -q 'cloudDraftSync.flush()' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramChatFragment.java
           grep -q 'cloudDraftSync.flush()' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
+          grep -q 'apiClient.put("/api/typing"' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTypingIndicatorController.java
+          grep -q 'apiClient.get(queryPath()' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTypingIndicatorController.java
+          grep -q 'STOP_DELAY_MS = 2500L' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTypingIndicatorController.java
+          grep -q 'new WaysGramTypingIndicatorController' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramChatFragment.java
+          grep -q 'new WaysGramTypingIndicatorController' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
+          grep -q 'typingIndicatorController.startPolling()' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramChatFragment.java
+          grep -q 'typingIndicatorController.stopPolling()' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramChatFragment.java
+          grep -q 'typingIndicatorController.startPolling()' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
+          grep -q 'typingIndicatorController.stopPolling()' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
           grep -q 'reply_to_body' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramChatFragment.java
           grep -q 'reply_to_body' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
           grep -q 'MessageDigest.getInstance("SHA-256")' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramDraftStore.java

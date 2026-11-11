@@ -1,6 +1,7 @@
 package org.telegram.messenger.waysgram;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
@@ -378,7 +379,7 @@ public final class WaysGramChatFragment extends BaseFragment {
         row.setContentDescription("Удерживайте сообщение, чтобы ответить");
         if (messageId > 0) {
             row.setOnLongClickListener(view -> {
-                setReplyTarget(messageId);
+                showMessageActions(message);
                 return true;
             });
         }
@@ -427,6 +428,83 @@ public final class WaysGramChatFragment extends BaseFragment {
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
             fileButton.setOnClickListener(view -> saveDocument(mediaId, mediaName, mediaType));
         }
+    }
+
+    private void showMessageActions(JSONObject message) {
+        long messageId = message.optLong("id", 0);
+        if (messageId <= 0) {
+            return;
+        }
+        String[] actions = {"Ответить", "Редактировать", "Удалить"};
+        new AlertDialog.Builder(getParentActivity())
+                .setItems(actions, (dialog, which) -> {
+                    if (which == 0) {
+                        setReplyTarget(messageId);
+                    } else if (which == 1) {
+                        editMessage(messageId, message.optString("body", ""));
+                    } else if (which == 2) {
+                        confirmDeleteMessage(messageId);
+                    }
+                })
+                .show();
+    }
+
+    private void editMessage(long messageId, String currentBody) {
+        EditText editor = new EditText(getParentActivity());
+        editor.setText(currentBody);
+        editor.setSelection(editor.length());
+        new AlertDialog.Builder(getParentActivity())
+                .setTitle("Редактировать сообщение")
+                .setView(editor)
+                .setNegativeButton("Отмена", null)
+                .setPositiveButton("Сохранить", (dialog, which) -> {
+                    String body = editor.getText() == null ? "" : editor.getText().toString().trim();
+                    if (body.length() == 0 || body.length() > 4000) {
+                        statusView.setText("Сообщение должно содержать от 1 до 4000 символов");
+                        return;
+                    }
+                    JSONObject payload = new JSONObject();
+                    try {
+                        payload.put("body", body);
+                    } catch (Exception exception) {
+                        statusView.setText("Не удалось подготовить изменение");
+                        return;
+                    }
+                    apiClient.patch("/api/messages/" + messageId, payload, new WaysGramApiClient.Callback() {
+                        @Override
+                        public void onSuccess(JSONObject response) {
+                            statusView.setText("Сообщение изменено");
+                            loadMessages();
+                        }
+
+                        @Override
+                        public void onError(String message, int statusCode) {
+                            statusView.setText(message);
+                        }
+                    });
+                })
+                .show();
+    }
+
+    private void confirmDeleteMessage(long messageId) {
+        new AlertDialog.Builder(getParentActivity())
+                .setTitle("Удалить сообщение?")
+                .setMessage("Сообщение будет удалено у участников переписки.")
+                .setNegativeButton("Отмена", null)
+                .setPositiveButton("Удалить", (dialog, which) ->
+                        apiClient.delete("/api/messages/" + messageId, new WaysGramApiClient.Callback() {
+                            @Override
+                            public void onSuccess(JSONObject response) {
+                                statusView.setText("Сообщение удалено");
+                                loadMessages();
+                            }
+
+                            @Override
+                            public void onError(String message, int statusCode) {
+                                statusView.setText(message);
+                            }
+                        }))
+                .show();
     }
 
     private void setReplyTarget(long messageId) {

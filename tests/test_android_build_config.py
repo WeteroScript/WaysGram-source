@@ -48,7 +48,7 @@ class AndroidDevBuildConfigurationTests(unittest.TestCase):
             self.assertEqual([path.read_text(encoding="utf-8") for path in (runtime, build_file, manifest)], before)
             self.assertFalse((root / "TMessagesProj/src/main/res/drawable/waysgram_launcher.xml").exists())
             props = (root / "gradle.properties").read_text(encoding="utf-8")
-            self.assertIn("APP_PACKAGE=org.telegram.messenger", props)
+            self.assertIn("APP_PACKAGE=org.waysgram.messenger", props)
             strings = (root / "TMessagesProj/src/main/res/values/strings.xml").read_text(encoding="utf-8")
             self.assertIn('<string name="AppName">WaysGram</string>', strings)
             self.assertIn('<string name="AppNameBeta">WaysGram Dev</string>', strings)

@@ -65,6 +65,10 @@ jobs:
           grep -q 'TYPE_CONTACTS' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramDirectoryFragment.java
           grep -q 'TYPE_BLOCKS' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramHomeFragment.java
           grep -q 'TYPE_BLOCKS' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramDirectoryFragment.java
+          grep -q 'Редактировать профиль' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramHomeFragment.java
+          grep -q 'apiClient.put("/api/me"' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramHomeFragment.java
+          grep -q 'apiClient.put("/api/me/avatar"' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramHomeFragment.java
+          grep -q 'REQUEST_AVATAR' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramHomeFragment.java
           grep -q 'apiClient.post("/api/blocks"' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramDirectoryFragment.java
           grep -q 'apiClient.delete("/api/blocks/"' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramDirectoryFragment.java
           grep -q 'apiClient.post("/api/contacts"' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramDirectoryFragment.java

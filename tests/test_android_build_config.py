@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import patch
 from pathlib import Path
 
-from scripts.prepare_android_dev_build import configure_android_root
+from scripts.prepare_android_dev_build import configure_android_root, configure_waysgram_firebase
 
 
 class AndroidDevBuildConfigurationTests(unittest.TestCase):
@@ -73,7 +73,7 @@ class AndroidDevBuildConfigurationTests(unittest.TestCase):
             with patch.dict(os.environ, {
                 "WAYSGRAM_FIREBASE_CONFIG_JSON": json.dumps(firebase_config),
             }, clear=False):
-                self.assertTrue(PREPARE.configure_waysgram_firebase(root))
+                self.assertTrue(configure_waysgram_firebase(root))
             generated = (
                 root / "TMessagesProj/src/main/java/org/telegram/messenger/waysgram/"
                 "WaysGramFirebaseConfig.java"
@@ -101,7 +101,7 @@ class AndroidDevBuildConfigurationTests(unittest.TestCase):
                 "WAYSGRAM_FIREBASE_CONFIG_JSON": json.dumps(firebase_config),
             }, clear=False):
                 with self.assertRaises(ValueError):
-                    PREPARE.configure_waysgram_firebase(Path(temp))
+                    configure_waysgram_firebase(Path(temp))
 
     def test_is_idempotent(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

@@ -567,7 +567,7 @@ public final class WaysGramApiClient implements AutoCloseable {
 
     @Override
     public void close() {
-        ioExecutor.shutdownNow();
+        ioExecutor.shutdown();
     }
 
     private static final class ApiException extends IOException {

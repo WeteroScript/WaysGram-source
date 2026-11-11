@@ -136,7 +136,6 @@ public final class WaysGramHomeFragment extends BaseFragment {
 
         fragmentView = scroll;
         loadProfile();
-        loadUnreadSummary();
         return scroll;
     }
 

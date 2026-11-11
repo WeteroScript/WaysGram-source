@@ -98,6 +98,10 @@ public final class WaysGramApiClient implements AutoCloseable {
         execute("PUT", path, payload == null ? new JSONObject() : payload, callback);
     }
 
+    public void patch(String path, JSONObject payload, Callback callback) {
+        execute("PATCH", path, payload == null ? new JSONObject() : payload, callback);
+    }
+
     public void delete(String path, Callback callback) {
         execute("DELETE", path, null, callback);
     }

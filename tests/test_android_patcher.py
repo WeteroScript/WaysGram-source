@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import importlib.util
+import os
+import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 
@@ -11,6 +14,12 @@ SPEC = importlib.util.spec_from_file_location("apply_android_patches", PATCHER_P
 assert SPEC is not None and SPEC.loader is not None
 PATCHER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(PATCHER)
+
+PREPARE_PATH = ROOT / "scripts" / "prepare_android_dev_build.py"
+PREPARE_SPEC = importlib.util.spec_from_file_location("prepare_android_dev_build", PREPARE_PATH)
+assert PREPARE_SPEC is not None and PREPARE_SPEC.loader is not None
+PREPARE = importlib.util.module_from_spec(PREPARE_SPEC)
+PREPARE_SPEC.loader.exec_module(PREPARE)
 
 
 class GiftCatalogContractTests(unittest.TestCase):
@@ -160,6 +169,39 @@ class SourcePreservationTests(unittest.TestCase):
     def test_verification_fails_when_upstream_files_are_missing(self) -> None:
         with self.assertRaises(FileNotFoundError):
             PATCHER.verify_source(Path("/definitely/missing/android"))
+
+
+class WaysGramBuildConfigurationTests(unittest.TestCase):
+    def test_public_api_base_url_overrides_the_login_default(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            android_root = Path(temporary)
+            login_sheet = (
+                android_root
+                / "TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramLoginSheet.java"
+            )
+            login_sheet.parent.mkdir(parents=True)
+            login_sheet.write_text(
+                'private static final String DEFAULT_API_BASE_URL = "https://old.example";\\n',
+                encoding="utf-8",
+            )
+            with patch.dict(
+                os.environ,
+                {"WAYSGRAM_API_BASE_URL": "https://authbot.waysgram.example/"},
+            ):
+                PREPARE.configure_default_api_base_url(android_root)
+            configured = login_sheet.read_text(encoding="utf-8")
+            self.assertIn(
+                'DEFAULT_API_BASE_URL = "https://authbot.waysgram.example";',
+                configured,
+            )
+            self.assertNotIn("old.example", configured)
+
+    def test_invalid_public_api_base_url_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            android_root = Path(temporary)
+            with patch.dict(os.environ, {"WAYSGRAM_API_BASE_URL": "authbot.waysgram.example"}):
+                with self.assertRaises(ValueError):
+                    PREPARE.configure_default_api_base_url(android_root)
 
 
 if __name__ == "__main__":

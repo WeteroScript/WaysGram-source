@@ -48,6 +48,7 @@ jobs:
             WaysGramTimelineFragment.java \
             WaysGramCloudDraftSync.java \
             WaysGramTypingIndicatorController.java \
+            WaysGramSharedMediaFragment.java \
             WaysGramGiftCatalogClient.java \
             WaysGramGiftCatalogSheet.java \
             WaysGramBotsFragment.java \
@@ -173,6 +174,13 @@ jobs:
           grep -q 'Закреплённые сообщения' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
           grep -q 'changePinnedMessage' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramChatFragment.java
           grep -q 'changePinnedMessage' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
+          grep -q 'new WaysGramSharedMediaFragment("dm"' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramChatFragment.java
+          grep -q 'new WaysGramSharedMediaFragment' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
+          grep -q 'apiClient.get(path' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramSharedMediaFragment.java
+          grep -q 'before_id' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramSharedMediaFragment.java
+          grep -q 'downloadImage(mediaId' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramSharedMediaFragment.java
+          grep -q 'downloadDocumentToUri' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramSharedMediaFragment.java
+          grep -q 'mediaKind' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramSharedMediaFragment.java
           grep -q 'reply_to_body' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramChatFragment.java
           grep -q 'reply_to_body' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
           grep -q 'MessageDigest.getInstance("SHA-256")' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramDraftStore.java

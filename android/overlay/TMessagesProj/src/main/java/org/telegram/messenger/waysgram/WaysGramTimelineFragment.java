@@ -892,8 +892,15 @@ public final class WaysGramTimelineFragment extends BaseFragment {
         long messageId = message.optLong("id", 0);
         long repliedToId = message.optLong("reply_to_id", 0);
         String body = prefix + message.optString("body", "");
-        row.setText(repliedToId > 0 ? "Ответ на сообщение #" + repliedToId + "\n" + body : body);
-        row.setContentDescription("Удерживайте сообщение, чтобы ответить");
+        if (repliedToId > 0) {
+            body = "Ответ на сообщение #" + repliedToId + "\n" + body;
+        }
+        String reactionSummary = message.optString("reaction_summary", "");
+        if (!reactionSummary.isEmpty()) {
+            body += "\n" + reactionSummary.replace(",", " · ").replace(":", " ");
+        }
+        row.setText(body);
+        row.setContentDescription("Удерживайте сообщение, чтобы ответить или поставить реакцию");
         if (messageId > 0) {
             row.setOnLongClickListener(view -> {
                 showMessageActions(message);
@@ -947,6 +954,44 @@ public final class WaysGramTimelineFragment extends BaseFragment {
         }
     }
 
+    private void showReactionPicker(long messageId) {
+        String[] reactions = {"👍", "❤️", "😂", "😮", "😢", "🎉", "🙏"};
+        new AlertDialog.Builder(getParentActivity())
+                .setTitle("Выберите реакцию")
+                .setItems(reactions, (dialog, which) -> {
+                    if (which >= 0 && which < reactions.length) {
+                        sendReaction(basePath() + "/" + messageId + "/reactions", reactions[which]);
+                    }
+                })
+                .setNegativeButton("Отмена", null)
+                .show();
+    }
+
+    private void sendReaction(String path, String reaction) {
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("reaction", reaction);
+        } catch (Exception exception) {
+            statusView.setText("Не удалось подготовить реакцию");
+            return;
+        }
+        statusView.setText("Сохраняю реакцию…");
+        apiClient.post(path, payload, new WaysGramApiClient.Callback() {
+            @Override
+            public void onSuccess(JSONObject response) {
+                statusView.setText("Реакция " + (response.optString("status").equals("removed")
+                        ? "удалена"
+                        : "добавлена"));
+                loadMessages();
+            }
+
+            @Override
+            public void onError(String message, int statusCode) {
+                statusView.setText(message);
+            }
+        });
+    }
+
     private String messagePath(long messageId) {
         return basePath() + "/" + messageId;
     }
@@ -956,14 +1001,16 @@ public final class WaysGramTimelineFragment extends BaseFragment {
         if (messageId <= 0) {
             return;
         }
-        String[] actions = {"Ответить", "Редактировать", "Удалить"};
+        String[] actions = {"Ответить", "Реакция", "Редактировать", "Удалить"};
         new AlertDialog.Builder(getParentActivity())
                 .setItems(actions, (dialog, which) -> {
                     if (which == 0) {
                         setReplyTarget(messageId);
                     } else if (which == 1) {
-                        editMessage(messageId, message.optString("body", ""));
+                        showReactionPicker(messageId);
                     } else if (which == 2) {
+                        editMessage(messageId, message.optString("body", ""));
+                    } else if (which == 3) {
                         confirmDeleteMessage(messageId);
                     }
                 })

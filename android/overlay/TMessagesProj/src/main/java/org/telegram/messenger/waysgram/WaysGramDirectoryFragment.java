@@ -50,6 +50,7 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
     private boolean joinRequestInFlight;
     private boolean showingContactSearchResults;
     private boolean showingBlockSearchResults;
+    private boolean showingConversationSearchResults;
     private boolean isScreenResumed;
     private boolean directoryEventsReady;
     private boolean directoryEventsInitializing;
@@ -224,7 +225,8 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
                                 lastDirectoryEventId,
                                 response.optLong("latest_id", lastDirectoryEventId)
                         );
-                        if (refreshDirectory) {
+                        if (refreshDirectory
+                                && !(type == TYPE_CONVERSATIONS && showingConversationSearchResults)) {
                             loadItems();
                         }
                         checkDirectoryEvents();
@@ -376,6 +378,8 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
             showingContactSearchResults = true;
         } else if (type == TYPE_BLOCKS) {
             showingBlockSearchResults = true;
+        } else if (type == TYPE_CONVERSATIONS) {
+            showingConversationSearchResults = true;
         }
         if (query.length() == 0) {
             statusView.setText("Введите username или имя для поиска");
@@ -604,6 +608,9 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
     }
 
     private void loadItems() {
+        if (type == TYPE_CONVERSATIONS) {
+            showingConversationSearchResults = false;
+        }
         String path;
         String key;
         if (type == TYPE_GROUPS) {

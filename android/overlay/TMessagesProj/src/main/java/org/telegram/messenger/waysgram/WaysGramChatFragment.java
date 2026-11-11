@@ -196,7 +196,7 @@ public final class WaysGramChatFragment extends BaseFragment {
                                         return;
                                     }
                                     StringBuilder results = new StringBuilder();
-                                    int displayCount = Math.min(count, 30);
+                                    int displayCount = Math.min(count, 20);
                                     for (int i = 0; i < displayCount; i++) {
                                         JSONObject message = messages.optJSONObject(i);
                                         if (message == null) {
@@ -210,17 +210,21 @@ public final class WaysGramChatFragment extends BaseFragment {
                                                         .format(new Date(createdAt * 1000L))
                                                 : "";
                                         if (results.length() > 0) {
-                                            results.append("\\n\\n");
+                                            results.append("\n\n");
                                         }
                                         results.append(author);
                                         if (!time.isEmpty()) {
                                             results.append(" · ").append(time);
                                         }
-                                        results.append("\\n").append(message.optString("body", ""));
+                                        String body = message.optString("body", "");
+                                        if (body.length() > 600) {
+                                            body = body.substring(0, 600) + "…";
+                                        }
+                                        results.append("\n").append(body);
                                     }
                                     statusView.setText("Найдено сообщений: " + count);
                                     if (count > displayCount) {
-                                        results.append("\\n\\nПоказаны первые ").append(displayCount)
+                                        results.append("\n\nПоказаны первые ").append(displayCount)
                                                 .append(" из ").append(count).append(" совпадений.");
                                     }
                                     new AlertDialog.Builder(getParentActivity())

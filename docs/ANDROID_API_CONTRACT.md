@@ -55,7 +55,11 @@ The current Android overlay calls these API areas:
 - Document upload: `POST /api/media/documents` for PDF, TXT, and CSV.
 - Authenticated attachment download: `GET /api/media/{media_id}`.
 
-Direct messages and group/channel timelines support text, static image, and PDF/TXT/CSV attachments. Message history and send responses expose `media_id`, `media_type`, and `media_name` for attachments. Images render inline; documents are saved through Android's system document picker. The backend returns documents with `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff`. Animated images, video, push/WebSocket delivery, calls, and background notifications are not implemented.
+Direct messages and group/channel timelines support text, static image, and PDF/TXT/CSV attachments. Message history and send responses expose `media_id`, `media_type`, and `media_name` for attachments. Images render inline; documents are saved through Android's system document picker. The backend returns documents with `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff`.
+
+Message rows expose a long-press action menu. Users can reply to a message using `reply_to_id`, edit their own message, or request deletion. The same UI pattern is available in direct chats, groups and channels. The backend validates the reply target and enforces author, membership, owner and administrator permissions for edits/deletions. Both `PATCH` and `PUT` are supported by the edit API; the Android client uses `PUT` for compatibility with `HttpURLConnection`.
+
+Animated images, video, push/WebSocket delivery, calls, and background notifications are not implemented.
 
 ## Group and channel management
 

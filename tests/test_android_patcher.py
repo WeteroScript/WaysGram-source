@@ -241,13 +241,13 @@ class SourcePreservationTests(unittest.TestCase):
         self.assertEqual(PATCHER.patch_push_service_source(patched), patched)
 
     def test_notification_permission_is_added_to_both_android_manifests(self) -> None:
-        anchor = '    <uses-permission android:name="com.google.android.c2dm.permission.RECEIVE" />\\n'
+        anchor = '    <uses-permission android:name="com.google.android.c2dm.permission.RECEIVE" />\n'
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             for variant in ("debug", "release"):
                 manifest = root / f"TMessagesProj/config/{variant}/AndroidManifest.xml"
                 manifest.parent.mkdir(parents=True)
-                manifest.write_text("<manifest>\\n" + anchor + "</manifest>\\n", encoding="utf-8")
+                manifest.write_text("<manifest>\n" + anchor + "</manifest>\n", encoding="utf-8")
             PATCHER.patch_notification_permissions(root)
             PATCHER.patch_notification_permissions(root)
             for variant in ("debug", "release"):

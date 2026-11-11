@@ -470,7 +470,7 @@ public final class WaysGramChatFragment extends BaseFragment {
                         statusView.setText("Не удалось подготовить изменение");
                         return;
                     }
-                    apiClient.patch("/api/messages/" + messageId, payload, new WaysGramApiClient.Callback() {
+                    apiClient.put("/api/messages/" + messageId, payload, new WaysGramApiClient.Callback() {
                         @Override
                         public void onSuccess(JSONObject response) {
                             statusView.setText("Сообщение изменено");

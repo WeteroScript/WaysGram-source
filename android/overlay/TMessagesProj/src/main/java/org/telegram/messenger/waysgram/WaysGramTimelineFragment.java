@@ -193,6 +193,18 @@ public final class WaysGramTimelineFragment extends BaseFragment {
         ));
         searchButton.setOnClickListener(view -> showMessageSearchDialog());
 
+        Button mediaButton = new Button(context);
+        mediaButton.setText("Общие медиа");
+        mediaButton.setAllCaps(false);
+        root.addView(mediaButton, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+        mediaButton.setOnClickListener(view ->
+                presentFragment(new WaysGramSharedMediaFragment(
+                        type == TYPE_GROUP ? "group" : "channel", targetId, targetTitle
+                ), false));
+
         Button pinnedButton = new Button(context);
         pinnedButton.setText("Закреплённые сообщения");
         pinnedButton.setAllCaps(false);

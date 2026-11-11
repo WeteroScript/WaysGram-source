@@ -86,6 +86,9 @@ public final class WaysGramHomeFragment extends BaseFragment {
 
         addButton(context, content, "Редактировать профиль", this::showProfileEditor);
         addButton(context, content, "Фото профиля", this::showAvatarActions);
+        addButton(context, content, "Контакты", () ->
+                presentFragment(new WaysGramDirectoryFragment(WaysGramDirectoryFragment.TYPE_CONTACTS), false)
+        );
         addButton(context, content, "Сообщения", () ->
                 presentFragment(new WaysGramDirectoryFragment(WaysGramDirectoryFragment.TYPE_CONVERSATIONS), false)
         );

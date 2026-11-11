@@ -736,12 +736,18 @@ public final class WaysGramTimelineFragment extends BaseFragment {
         String myRole = group.optString("my_role", "member");
         JSONArray members = group.optJSONArray("members");
         int count = members == null ? 0 : members.length();
-        managementStatusView.setText("Ваша роль: " + roleLabel(myRole) + " · участников: " + count);
+        int slowModeSeconds = group.optInt("slow_mode_seconds", 0);
+        managementStatusView.setText(
+                "Ваша роль: " + roleLabel(myRole)
+                        + " · участников: " + count
+                        + " · медленный режим: " + slowModeLabel(slowModeSeconds)
+        );
         managementActionButton.setEnabled("owner".equals(myRole) || "admin".equals(myRole));
         managementList.removeAllViews();
         if ("owner".equals(myRole) || "admin".equals(myRole)) {
             addSmallButton(managementList, "Создать ссылку-приглашение", this::createGroupInvite);
             addSmallButton(managementList, "Заявки на вступление", this::loadGroupJoinRequests);
+            addSmallButton(managementList, "Настроить медленный режим", () -> showSlowModeOptions(slowModeSeconds));
         }
         long myId = group.optLong("my_telegram_id", 0);
         if (!"owner".equals(myRole) && myId > 0) {
@@ -822,6 +828,76 @@ public final class WaysGramTimelineFragment extends BaseFragment {
                 managementList.addView(actions, matchWrap());
             }
         }
+    }
+
+    private String slowModeLabel(int seconds) {
+        if (seconds <= 0) {
+            return "выключен";
+        }
+        if (seconds < 60) {
+            return seconds + " сек.";
+        }
+        return (seconds / 60) + " мин.";
+    }
+
+    private void showSlowModeOptions(int currentSeconds) {
+        final int[] intervals = {0, 5, 10, 15, 30, 60, 120, 300};
+        String[] labels = {
+                "Выключен", "5 секунд", "10 секунд", "15 секунд",
+                "30 секунд", "1 минута", "2 минуты", "5 минут"
+        };
+        new AlertDialog.Builder(getParentActivity())
+                .setTitle("Медленный режим")
+                .setMessage("Обычные участники смогут отправлять сообщения не чаще выбранного интервала. Владелец и администраторы не ограничиваются.")
+                .setSingleChoiceItems(labels, indexOfSlowMode(intervals, currentSeconds),
+                        (dialog, which) -> {
+                            if (which < 0 || which >= intervals.length) {
+                                return;
+                            }
+                            dialog.dismiss();
+                            updateGroupSlowMode(intervals[which]);
+                        })
+                .setNegativeButton("Закрыть", null)
+                .show();
+    }
+
+    private int indexOfSlowMode(int[] intervals, int seconds) {
+        for (int i = 0; i < intervals.length; i++) {
+            if (intervals[i] == seconds) {
+                return i;
+            }
+        }
+        return 0;
+    }
+
+    private void updateGroupSlowMode(int seconds) {
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("seconds", seconds);
+        } catch (Exception exception) {
+            managementStatusView.setText("Не удалось подготовить настройку.");
+            return;
+        }
+        managementStatusView.setText("Обновляю медленный режим…");
+        apiClient.put("/api/groups/" + targetId + "/slow-mode", payload,
+                new WaysGramApiClient.Callback() {
+                    @Override
+                    public void onSuccess(JSONObject response) {
+                        managementStatusView.setText("Медленный режим: " + slowModeLabel(
+                                response.optInt("slow_mode_seconds", seconds)
+                        ));
+                        loadManagement();
+                    }
+
+                    @Override
+                    public void onError(String message, int statusCode) {
+                        managementStatusView.setText(message);
+                        if (statusCode == 401) {
+                            WaysGramSessionStore.getInstance(getParentActivity()).clearSession();
+                            presentFragment(new WaysGramLoginFragment(), true);
+                        }
+                    }
+                });
     }
 
     private void createGroupInvite() {

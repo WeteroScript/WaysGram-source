@@ -907,7 +907,7 @@ public final class WaysGramTimelineFragment extends BaseFragment {
                         statusView.setText("Не удалось подготовить изменение");
                         return;
                     }
-                    apiClient.patch(messagePath(messageId), payload, new WaysGramApiClient.Callback() {
+                    apiClient.put(messagePath(messageId), payload, new WaysGramApiClient.Callback() {
                         @Override
                         public void onSuccess(JSONObject response) {
                             statusView.setText("Сообщение изменено");

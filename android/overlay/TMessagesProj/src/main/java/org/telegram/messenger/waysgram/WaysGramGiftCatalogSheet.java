@@ -413,7 +413,7 @@ public final class WaysGramGiftCatalogSheet extends BottomSheet {
             } else if (!gift.forSale && gift.premium) {
                 stockView.setText("Требуется Premium");
                 stockView.setVisibility(View.VISIBLE);
-            } else {
+            } else if (!gift.forSale) {
                 stockView.setVisibility(View.GONE);
             }
             if (sticker != null && !sticker.isRecycled()) {

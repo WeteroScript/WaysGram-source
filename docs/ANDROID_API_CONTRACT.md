@@ -47,6 +47,10 @@ The current Android overlay calls these API areas:
 - Contacts: `GET /api/contacts`, `POST /api/contacts`, and `DELETE /api/contacts/{user_id}`. Contacts are added manually from user search; phone-book synchronization is not implemented.
 - Block list: `GET /api/blocks`, `POST /api/blocks`, and `DELETE /api/blocks/{user_id}`. A block prevents either user from sending or forwarding direct messages to the other until unblocked.
 - Personal messages: `GET /api/messages` and `POST /api/messages`.
+- Message reactions:
+  - Direct messages: `POST /api/messages/{message_id}/reactions`.
+  - Groups: `POST /api/groups/{group_id}/messages/{message_id}/reactions`.
+  - Channels: `POST /api/channels/{channel_id}/messages/{message_id}/reactions`.
 - Forward a direct message into another conversation: `POST /api/messages/{message_id}/forward` with `recipient_id` and optional `Idempotency-Key`. The server requires access to the source conversation and stores the original message/user attribution.
 - Search within a personal conversation: `GET /api/messages/search?with={peer_id}&q={text}` (up to 100 matches, scoped to the authenticated conversation).
 - Groups: `GET /api/groups`, `POST /api/groups`, group history, text-post and message-search routes.
@@ -61,7 +65,7 @@ The current Android overlay calls these API areas:
 
 Direct messages support text, conversation-scoped message search, static image, and PDF/TXT/CSV attachments. Group/channel timelines support text, static image and PDF/TXT/CSV attachments. Message history and send responses expose `media_id`, `media_type`, and `media_name` for attachments. Images render inline; documents are saved through Android's system document picker. The backend returns documents with `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff`.
 
-Message rows expose a long-press action menu. Users can reply to a message using `reply_to_id`, edit their own message, request deletion, or forward a message to a contact. Forwarded messages preserve the original sender and source message ID; forwarding is checked against source-conversation access and is idempotent when the same key is retried. The same UI pattern is available in direct chats, groups and channels. The backend validates the reply target and enforces author, membership, owner and administrator permissions for edits/deletions. Both `PATCH` and `PUT` are supported by the edit API; the Android client uses `PUT` for compatibility with `HttpURLConnection`. Direct-message rows display their timestamp and show whether the peer's read marker covers the message; the UI refreshes when that marker advances.
+Message rows expose a long-press action menu. Users can reply to a message using `reply_to_id`, edit their own message, request deletion, forward a message to a contact, or add and remove a reaction. Direct chats, groups and channels accept `👍`, `❤️`, `😂`, `😮`, `😢`, `🎉` and `🙏`; each user may keep up to three distinct reactions on one message. Sending an existing reaction toggles it off. Forwarded messages preserve the original sender and source message ID; forwarding is checked against source-conversation access and is idempotent when the same key is retried. The same UI pattern is available in direct chats, groups and channels. The backend validates the reply target and enforces author, membership, owner and administrator permissions for edits/deletions. Both `PATCH` and `PUT` are supported by the edit API; the Android client uses `PUT` for compatibility with `HttpURLConnection`. Direct-message rows display their timestamp and show whether the peer's read marker covers the message; the UI refreshes when that marker advances.
 
 Animated images, video, push/WebSocket delivery, calls, and background notifications are not implemented.
 

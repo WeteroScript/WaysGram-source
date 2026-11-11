@@ -179,6 +179,16 @@ public final class WaysGramChatFragment extends BaseFragment {
         ));
         searchButton.setOnClickListener(view -> showMessageSearchDialog());
 
+        Button mediaButton = new Button(context);
+        mediaButton.setText("Общие медиа");
+        mediaButton.setAllCaps(false);
+        root.addView(mediaButton, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+        mediaButton.setOnClickListener(view ->
+                presentFragment(new WaysGramSharedMediaFragment("dm", peerId, peerTitle), false));
+
         Button pinnedButton = new Button(context);
         pinnedButton.setText("Закреплённые сообщения");
         pinnedButton.setAllCaps(false);

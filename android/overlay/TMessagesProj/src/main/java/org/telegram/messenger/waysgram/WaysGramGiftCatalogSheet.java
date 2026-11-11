@@ -36,10 +36,11 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Read-only WaysGram Telegram gift catalogue sheet.
+ * WaysGram Telegram gift storefront.
  *
- * Prices shown here are Telegram Stars returned by the configured AuthBot.
- * This screen intentionally does not send, purchase, transfer or auction gifts.
+ * The AuthBot admin panel controls the sale price and available stock. This
+ * client displays those values and lets signed-in users purchase items into
+ * their WaysGram inventory.
  */
 public final class WaysGramGiftCatalogSheet extends BottomSheet {
     private final WaysGramGiftCatalogClient catalogClient;
@@ -80,7 +81,7 @@ public final class WaysGramGiftCatalogSheet extends BottomSheet {
         );
 
         TextView subtitle = new TextView(context);
-        subtitle.setText("Каталог доступных подарков · цена в Telegram Stars");
+        subtitle.setText("Магазин WaysGram · цены указаны в WaysGram Stars");
         subtitle.setTextSize(13);
         subtitle.setTextColor(Theme.getColor(Theme.key_dialogTextGray2, resourcesProvider));
         subtitle.setPadding(AndroidUtilities.dp(2), 0, AndroidUtilities.dp(2), AndroidUtilities.dp(10));
@@ -396,7 +397,7 @@ public final class WaysGramGiftCatalogSheet extends BottomSheet {
                 buyButton.setText("Купить");
                 buyButton.setOnClickListener(view -> showPurchaseConfirmation(gift));
             } else {
-                priceView.setText(gift.starCount + " Telegram Stars");
+                priceView.setText("Не выставлен на продажу");
                 buyButton.setVisibility(View.GONE);
                 buyButton.setOnClickListener(null);
             }

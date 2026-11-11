@@ -170,6 +170,44 @@ class WaysGramChatContractTests(unittest.TestCase):
         self.assertIn("markMessagesRead();", source)
 
 
+class WaysGramSettingsEntryTests(unittest.TestCase):
+    def test_settings_entry_opens_login_or_home_based_on_waysgram_session(self) -> None:
+        original = (
+            "package org.telegram.ui;\n"
+            "import org.telegram.messenger.UserObject;\n"
+            "class SettingsActivity {\n"
+            "    private void buildSettingsItems() {\n"
+            '        items.add(SettingCell.Factory.of(23, IconBackgroundColors.PURPLE.top, '
+            'IconBackgroundColors.PURPLE.bottom, R.drawable.settings_features, '
+            'getString(R.string.TelegramFeatures)));\n'
+            "    }\n"
+            "    private void onClick(UItem item, View view, int position, float x, float y) {\n"
+            "        switch (item.id) {\n"
+            "            case 20:\n"
+            "                ProfileActivity.sendLogs(getParentActivity(), false);\n"
+            "                break;\n"
+            "        }\n"
+            "    }\n"
+            "    private boolean onLongClick(UItem item, View view, int position, float x, float y) {\n"
+            "        return false;\n"
+            "    }\n"
+            "}\n"
+        )
+        patched = PATCHER.patch_settings_source(original)
+        self.assertIn("WaysGramHomeFragment", patched)
+        self.assertIn("WaysGramLoginFragment", patched)
+        self.assertIn("waysGramSessionStore.hasSession()", patched)
+        self.assertIn('items.add(SettingCell.Factory.of(27', patched)
+        self.assertEqual(PATCHER.patch_settings_source(patched), patched)
+
+    def test_settings_patch_rejects_partial_application(self) -> None:
+        with self.assertRaises(ValueError):
+            PATCHER.patch_settings_source(
+                "import org.telegram.messenger.UserObject;\n"
+                "import org.telegram.messenger.waysgram.WaysGramHomeFragment;\n"
+            )
+
+
 class SourcePreservationTests(unittest.TestCase):
     def test_gift_sheet_source_is_unchanged(self) -> None:
         original = "import org.telegram.messenger.UserObject;\nclass GiftSheet {}\n"

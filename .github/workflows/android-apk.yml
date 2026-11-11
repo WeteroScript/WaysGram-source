@@ -1,10 +1,7 @@
 name: WaysGram Android debug APK
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/android-apk.yml"
+  # APK builds are manual-only. Source changes must not start a build implicitly.
   workflow_dispatch:
 
 permissions:

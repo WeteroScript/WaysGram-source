@@ -8,9 +8,11 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
+import android.text.InputType;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -27,6 +29,7 @@ import org.telegram.messenger.AndroidUtilities;
 import org.telegram.ui.ActionBar.BottomSheet;
 import org.telegram.ui.ActionBar.Theme;
 import org.json.JSONObject;
+import org.json.JSONArray;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -117,6 +120,15 @@ public final class WaysGramGiftCatalogSheet extends BottomSheet {
                 ViewGroup.LayoutParams.WRAP_CONTENT
         ));
 
+        Button marketButton = new Button(context);
+        marketButton.setAllCaps(false);
+        marketButton.setText("Маркетплейс подарков");
+        marketButton.setOnClickListener(view -> showGiftMarket());
+        content.addView(marketButton, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+
         FrameLayout statusContainer = new FrameLayout(context);
         statusView = new TextView(context);
         statusView.setText("Загрузка каталога…");
@@ -162,58 +174,252 @@ public final class WaysGramGiftCatalogSheet extends BottomSheet {
         if (inventoryDialog != null && inventoryDialog.isShowing()) {
             inventoryDialog.dismiss();
         }
-        AlertDialog dialog = new AlertDialog.Builder(getContext())
+        AlertDialog loading = new AlertDialog.Builder(getContext())
                 .setTitle("Мои подарки")
                 .setMessage("Загружаю инвентарь…")
                 .setPositiveButton("Закрыть", null)
                 .create();
-        inventoryDialog = dialog;
-        dialog.setOnDismissListener(ignored -> {
-            if (inventoryDialog == dialog) {
+        inventoryDialog = loading;
+        loading.setOnDismissListener(ignored -> {
+            if (inventoryDialog == loading) {
                 inventoryDialog = null;
             }
         });
-        dialog.show();
+        loading.show();
         catalogClient.loadMyGifts(new WaysGramGiftCatalogClient.InventoryCallback() {
             @Override
-            public void onLoaded(org.json.JSONArray gifts) {
+            public void onLoaded(JSONArray gifts) {
                 AndroidUtilities.runOnUIThread(() -> {
-                    if (isDismissed() || !dialog.isShowing()) {
+                    if (isDismissed() || !loading.isShowing()) {
                         return;
                     }
                     if (gifts.length() == 0) {
-                        dialog.setMessage("Инвентарь пока пуст.");
+                        loading.setMessage("Инвентарь пока пуст.");
                         return;
                     }
-                    StringBuilder text = new StringBuilder();
+                    ArrayList<JSONObject> items = new ArrayList<>();
+                    String[] labels = new String[gifts.length()];
                     for (int i = 0; i < gifts.length(); i++) {
                         JSONObject gift = gifts.optJSONObject(i);
                         if (gift == null) {
+                            labels[i] = "Подарок";
+                            items.add(new JSONObject());
                             continue;
                         }
-                        if (text.length() > 0) {
-                            text.append("\n\n");
-                        }
+                        items.add(gift);
                         String name = gift.optString("gift_name", "Подарок WaysGram");
                         String serial = gift.optString("serial_number", "");
-                        String telegramGiftId = gift.optString("telegram_gift_id", "");
-                        text.append(name);
-                        if (!serial.isEmpty()) {
-                            text.append("\nСерийный номер: ").append(serial);
-                        }
-                        if (!telegramGiftId.isEmpty()) {
-                            text.append("\nTelegram Gift ID: ").append(telegramGiftId);
-                        }
+                        int level = gift.optInt("upgrade_level", 0);
+                        labels[i] = name + (level > 0 ? " · уровень " + level : "")
+                                + (gift.optBoolean("is_listed", false) ? " · выставлен" : "")
+                                + (serial.isEmpty() ? "" : "\n" + serial);
                     }
-                    dialog.setMessage(text.length() == 0 ? "Инвентарь пока пуст." : text.toString());
+                    loading.dismiss();
+                    AlertDialog list = new AlertDialog.Builder(getContext())
+                            .setTitle("Мои подарки")
+                            .setItems(labels, (dialog, which) -> {
+                                if (which >= 0 && which < items.size()) {
+                                    showGiftActions(items.get(which));
+                                }
+                            })
+                            .setPositiveButton("Закрыть", null)
+                            .create();
+                    inventoryDialog = list;
+                    list.setOnDismissListener(ignored -> {
+                        if (inventoryDialog == list) {
+                            inventoryDialog = null;
+                        }
+                    });
+                    list.show();
                 });
             }
 
             @Override
             public void onError(String message) {
                 AndroidUtilities.runOnUIThread(() -> {
-                    if (!isDismissed() && dialog.isShowing()) {
-                        dialog.setMessage("Не удалось загрузить инвентарь: " + message);
+                    if (!isDismissed() && loading.isShowing()) {
+                        loading.setMessage("Не удалось загрузить инвентарь: " + message);
+                    }
+                });
+            }
+        });
+    }
+
+    private void showGiftActions(JSONObject gift) {
+        String serial = gift.optString("serial_number", "");
+        String name = gift.optString("gift_name", "Подарок WaysGram");
+        if (serial.isEmpty()) {
+            return;
+        }
+        ArrayList<String> actions = new ArrayList<>();
+        boolean listed = gift.optBoolean("is_listed", false);
+        actions.add(listed ? "Снять с продажи" : "Выставить на продажу");
+        boolean canUpgrade = gift.optString("telegram_gift_id", "").length() > 0;
+        if (canUpgrade) {
+            actions.add("Улучшить за WaysGram Stars");
+        }
+        actions.add("Передать пользователю");
+        new AlertDialog.Builder(getContext())
+                .setTitle(name)
+                .setMessage("Серийный номер: " + serial)
+                .setItems(actions.toArray(new String[0]), (dialog, which) -> {
+                    if (which < 0 || which >= actions.size()) {
+                        return;
+                    }
+                    String action = actions.get(which);
+                    if (action.equals("Выставить на продажу")) {
+                        showGiftListingPrice(serial);
+                    } else if (action.equals("Снять с продажи")) {
+                        catalogClient.cancelGiftListing(serial, giftActionCallback("Объявление снято"));
+                    } else if (action.equals("Улучшить за WaysGram Stars")) {
+                        new AlertDialog.Builder(getContext())
+                                .setTitle("Улучшить подарок")
+                                .setMessage("Стоимость улучшения будет списана с внутреннего баланса WaysGram Stars.")
+                                .setNegativeButton("Отмена", null)
+                                .setPositiveButton("Улучшить", (d, w) ->
+                                        catalogClient.upgradeGift(serial, giftActionCallback("Подарок улучшен")))
+                                .show();
+                    } else if (action.equals("Передать пользователю")) {
+                        showGiftTransfer(serial);
+                    }
+                })
+                .setNegativeButton("Закрыть", null)
+                .show();
+    }
+
+    private void showGiftListingPrice(String serial) {
+        EditText priceInput = new EditText(getContext());
+        priceInput.setSingleLine(true);
+        priceInput.setInputType(InputType.TYPE_CLASS_NUMBER);
+        priceInput.setHint("Цена в Gram");
+        new AlertDialog.Builder(getContext())
+                .setTitle("Выставить подарок")
+                .setMessage("Укажите фиксированную цену в Gram.")
+                .setView(priceInput)
+                .setNegativeButton("Отмена", null)
+                .setPositiveButton("Выставить", (dialog, which) -> {
+                    try {
+                        int price = Integer.parseInt(priceInput.getText().toString().trim());
+                        catalogClient.listGift(serial, price, giftActionCallback("Подарок выставлен на маркетплейсе"));
+                    } catch (NumberFormatException exception) {
+                        Toast.makeText(getContext(), "Укажите целую цену в Gram", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .show();
+    }
+
+    private void showGiftTransfer(String serial) {
+        EditText recipientInput = new EditText(getContext());
+        recipientInput.setSingleLine(true);
+        recipientInput.setHint("Username или ID пользователя");
+        new AlertDialog.Builder(getContext())
+                .setTitle("Передать подарок")
+                .setView(recipientInput)
+                .setNegativeButton("Отмена", null)
+                .setPositiveButton("Передать", (dialog, which) -> {
+                    String recipient = recipientInput.getText().toString().trim();
+                    if (recipient.isEmpty()) {
+                        Toast.makeText(getContext(), "Укажите получателя", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    catalogClient.transferGift(serial, recipient, giftActionCallback("Подарок передан"));
+                })
+                .show();
+    }
+
+    private WaysGramGiftCatalogClient.ActionCallback giftActionCallback(String successMessage) {
+        return new WaysGramGiftCatalogClient.ActionCallback() {
+            @Override
+            public void onComplete(JSONObject result) {
+                AndroidUtilities.runOnUIThread(() -> {
+                    if (isDismissed()) {
+                        return;
+                    }
+                    Toast.makeText(getContext(), successMessage, Toast.LENGTH_LONG).show();
+                    showMyGifts();
+                    loadCatalog();
+                    if (onPurchaseComplete != null) {
+                        onPurchaseComplete.run();
+                    }
+                });
+            }
+
+            @Override
+            public void onError(String message) {
+                AndroidUtilities.runOnUIThread(() -> {
+                    if (!isDismissed()) {
+                        Toast.makeText(getContext(), "Операция не выполнена: " + message, Toast.LENGTH_LONG).show();
+                    }
+                });
+            }
+        };
+    }
+
+    private void showGiftMarket() {
+        AlertDialog loading = new AlertDialog.Builder(getContext())
+                .setTitle("Маркетплейс подарков")
+                .setMessage("Загружаю объявления…")
+                .setPositiveButton("Закрыть", null)
+                .create();
+        loading.show();
+        catalogClient.loadMarket(new WaysGramGiftCatalogClient.MarketCallback() {
+            @Override
+            public void onLoaded(JSONArray listings) {
+                AndroidUtilities.runOnUIThread(() -> {
+                    if (isDismissed() || !loading.isShowing()) {
+                        return;
+                    }
+                    if (listings.length() == 0) {
+                        loading.setMessage("Активных объявлений пока нет.");
+                        return;
+                    }
+                    ArrayList<JSONObject> items = new ArrayList<>();
+                    String[] labels = new String[listings.length()];
+                    for (int i = 0; i < listings.length(); i++) {
+                        JSONObject listing = listings.optJSONObject(i);
+                        if (listing == null) {
+                            items.add(new JSONObject());
+                            labels[i] = "Подарок";
+                            continue;
+                        }
+                        items.add(listing);
+                        String seller = listing.optString("seller_username", "");
+                        labels[i] = listing.optString("gift_name", "Подарок WaysGram")
+                                + " · " + listing.optInt("price_grams", 0) + " Gram"
+                                + (seller.isEmpty() ? "" : " · @" + seller);
+                    }
+                    loading.dismiss();
+                    new AlertDialog.Builder(getContext())
+                            .setTitle("Маркетплейс подарков")
+                            .setItems(labels, (dialog, which) -> {
+                                if (which < 0 || which >= items.size()) {
+                                    return;
+                                }
+                                JSONObject listing = items.get(which);
+                                int listingId = listing.optInt("listing_id", 0);
+                                String giftName = listing.optString("gift_name", "Подарок WaysGram");
+                                int price = listing.optInt("price_grams", 0);
+                                new AlertDialog.Builder(getContext())
+                                        .setTitle("Купить подарок")
+                                        .setMessage(giftName + "\nЦена: " + price + " Gram")
+                                        .setNegativeButton("Отмена", null)
+                                        .setPositiveButton("Купить", (d, w) ->
+                                                catalogClient.purchaseMarketGift(
+                                                        listingId,
+                                                        giftActionCallback("Подарок куплен")
+                                                ))
+                                        .show();
+                            })
+                            .setPositiveButton("Закрыть", null)
+                            .show();
+                });
+            }
+
+            @Override
+            public void onError(String message) {
+                AndroidUtilities.runOnUIThread(() -> {
+                    if (!isDismissed() && loading.isShowing()) {
+                        loading.setMessage("Не удалось загрузить маркетплейс: " + message);
                     }
                 });
             }

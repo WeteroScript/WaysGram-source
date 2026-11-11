@@ -6,12 +6,15 @@ import org.json.JSONObject;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -43,12 +46,20 @@ public final class WaysGramGiftCatalogClient implements AutoCloseable {
         void onError(String message);
     }
 
+    public interface PurchaseCallback {
+        void onPurchased(JSONObject result);
+        void onError(String message);
+    }
+
     public static final class Gift {
         public final String id;
         public final String title;
         public final String emoji;
         public final String currency;
         public final int starCount;
+        public final int storePriceStars;
+        public final int storeRemaining;
+        public final boolean forSale;
         public final Integer upgradeStarCount;
         public final boolean premium;
         public final boolean hasColors;
@@ -82,6 +93,9 @@ public final class WaysGramGiftCatalogClient implements AutoCloseable {
             emoji = object.optString("emoji", "");
             currency = object.optString("currency", "telegram_stars");
             starCount = Math.max(0, object.optInt("star_count", 0));
+            storePriceStars = Math.max(0, object.optInt("price_stars", 0));
+            storeRemaining = Math.max(0, object.optInt("remaining", 0));
+            forSale = object.optBoolean("for_sale", storePriceStars > 0 && storeRemaining > 0);
             upgradeStarCount = optionalInt(object, "upgrade_star_count");
             premium = object.optBoolean("is_premium", false);
             hasColors = object.optBoolean("has_colors", false);
@@ -182,6 +196,34 @@ public final class WaysGramGiftCatalogClient implements AutoCloseable {
     }
 
     /**
+     * Purchases a gift from the WaysGram storefront. Price and supply are
+     * controlled only by the AuthBot administrator panel.
+     */
+    public void purchaseGift(Gift gift, PurchaseCallback callback) {
+        if (gift == null || callback == null || !gift.forSale) {
+            if (callback != null) {
+                callback.onError("Подарок сейчас недоступен для покупки");
+            }
+            return;
+        }
+        ioExecutor.execute(() -> {
+            try {
+                String encodedGiftId = URLEncoder.encode(gift.id, "UTF-8").replace("+", "%20");
+                JSONObject payload = new JSONObject();
+                JSONObject response = requestJson(
+                        getBaseUrl() + "/api/telegram/gifts/" + encodedGiftId + "/purchase",
+                        "POST",
+                        payload.toString(),
+                        "wg-" + UUID.randomUUID().toString()
+                );
+                callback.onPurchased(response);
+            } catch (Exception exception) {
+                callback.onError(toSafeError(exception));
+            }
+        });
+    }
+
+    /**
      * Downloads a gift's sticker bytes through the authenticated WaysGram
      * proxy. The Telegram bot token and Telegram file_id never reach the app.
      */
@@ -203,7 +245,16 @@ public final class WaysGramGiftCatalogClient implements AutoCloseable {
     }
 
     private JSONObject requestJson(String url) throws IOException {
-        byte[] body = requestBytes(url, MAX_JSON_BYTES);
+        return requestJson(url, "GET", null, null);
+    }
+
+    private JSONObject requestJson(
+            String url,
+            String method,
+            @Nullable String requestBody,
+            @Nullable String idempotencyKey
+    ) throws IOException {
+        byte[] body = requestBytes(url, MAX_JSON_BYTES, method, requestBody, idempotencyKey);
         try {
             return new JSONObject(new String(body, StandardCharsets.UTF_8));
         } catch (Exception exception) {
@@ -212,6 +263,16 @@ public final class WaysGramGiftCatalogClient implements AutoCloseable {
     }
 
     private byte[] requestBytes(String url, int maxBytes) throws IOException {
+        return requestBytes(url, maxBytes, "GET", null, null);
+    }
+
+    private byte[] requestBytes(
+            String url,
+            int maxBytes,
+            String method,
+            @Nullable String requestBody,
+            @Nullable String idempotencyKey
+    ) throws IOException {
         String token = sessionProvider.getWaysGramSessionToken();
         if (token == null || token.trim().length() == 0) {
             throw new IOException("WaysGram session is missing");
@@ -219,12 +280,24 @@ public final class WaysGramGiftCatalogClient implements AutoCloseable {
         HttpURLConnection connection = null;
         try {
             connection = (HttpURLConnection) new URL(url).openConnection();
-            connection.setRequestMethod("GET");
+            connection.setRequestMethod(method);
             connection.setInstanceFollowRedirects(false);
             connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
             connection.setReadTimeout(READ_TIMEOUT_MS);
             connection.setRequestProperty("Accept", "*/*");
             connection.setRequestProperty("Authorization", "Bearer " + token.trim());
+            if (idempotencyKey != null && idempotencyKey.length() > 0) {
+                connection.setRequestProperty("Idempotency-Key", idempotencyKey);
+            }
+            if ("POST".equals(method)) {
+                byte[] requestBytes = (requestBody == null ? "" : requestBody).getBytes(StandardCharsets.UTF_8);
+                connection.setDoOutput(true);
+                connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+                connection.setFixedLengthStreamingMode(requestBytes.length);
+                try (OutputStream output = connection.getOutputStream()) {
+                    output.write(requestBytes);
+                }
+            }
             int status = connection.getResponseCode();
             if (status < 200 || status >= 300) {
                 throw new HttpStatusException(status);
@@ -293,7 +366,14 @@ public final class WaysGramGiftCatalogClient implements AutoCloseable {
 
     private static String toSafeError(Exception exception) {
         if (exception instanceof HttpStatusException) {
-            return "WaysGram API returned HTTP " + ((HttpStatusException) exception).statusCode;
+            int status = ((HttpStatusException) exception).statusCode;
+            if (status == 409) {
+                return "Покупка отклонена: проверьте баланс и наличие подарка";
+            }
+            if (status == 403) {
+                return "Покупка недоступна для этого аккаунта";
+            }
+            return "WaysGram API returned HTTP " + status;
         }
         if (exception instanceof IOException && exception.getMessage() != null
                 && exception.getMessage().startsWith("WaysGram")) {

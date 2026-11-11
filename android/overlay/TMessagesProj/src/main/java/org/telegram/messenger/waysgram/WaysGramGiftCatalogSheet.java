@@ -101,6 +101,15 @@ public final class WaysGramGiftCatalogSheet extends BottomSheet {
                 ViewGroup.LayoutParams.WRAP_CONTENT
         ));
 
+        Button inventoryButton = new Button(context);
+        inventoryButton.setAllCaps(false);
+        inventoryButton.setText("Мои подарки");
+        inventoryButton.setOnClickListener(view -> showMyGifts());
+        content.addView(inventoryButton, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+
         FrameLayout statusContainer = new FrameLayout(context);
         statusView = new TextView(context);
         statusView.setText("Загрузка каталога…");
@@ -140,6 +149,59 @@ public final class WaysGramGiftCatalogSheet extends BottomSheet {
         ));
 
         return content;
+    }
+
+    private void showMyGifts() {
+        AlertDialog dialog = new AlertDialog.Builder(getContext())
+                .setTitle("Мои подарки")
+                .setMessage("Загружаю инвентарь…")
+                .setPositiveButton("Закрыть", null)
+                .create();
+        dialog.show();
+        catalogClient.loadMyGifts(new WaysGramGiftCatalogClient.InventoryCallback() {
+            @Override
+            public void onLoaded(org.json.JSONArray gifts) {
+                AndroidUtilities.runOnUIThread(() -> {
+                    if (isDismissed() || !dialog.isShowing()) {
+                        return;
+                    }
+                    if (gifts.length() == 0) {
+                        dialog.setMessage("Инвентарь пока пуст.");
+                        return;
+                    }
+                    StringBuilder text = new StringBuilder();
+                    for (int i = 0; i < gifts.length(); i++) {
+                        JSONObject gift = gifts.optJSONObject(i);
+                        if (gift == null) {
+                            continue;
+                        }
+                        if (text.length() > 0) {
+                            text.append("\\n\\n");
+                        }
+                        String name = gift.optString("gift_name", "Подарок WaysGram");
+                        String serial = gift.optString("serial_number", "");
+                        String telegramGiftId = gift.optString("telegram_gift_id", "");
+                        text.append(name);
+                        if (!serial.isEmpty()) {
+                            text.append("\\nСерийный номер: ").append(serial);
+                        }
+                        if (!telegramGiftId.isEmpty()) {
+                            text.append("\\nTelegram Gift ID: ").append(telegramGiftId);
+                        }
+                    }
+                    dialog.setMessage(text.length() == 0 ? "Инвентарь пока пуст." : text.toString());
+                });
+            }
+
+            @Override
+            public void onError(String message) {
+                AndroidUtilities.runOnUIThread(() -> {
+                    if (!isDismissed() && dialog.isShowing()) {
+                        dialog.setMessage("Не удалось загрузить инвентарь: " + message);
+                    }
+                });
+            }
+        });
     }
 
     private void loadCatalog() {

@@ -697,7 +697,7 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
                 detail = item.optString("last_message", "");
                 int unreadCount = item.optInt("unread_count", 0);
                 if (unreadCount > 0) {
-                    detail += (detail.isEmpty() ? "" : "\\n")
+                    detail += (detail.isEmpty() ? "" : "\n")
                             + "Непрочитано: " + unreadCount;
                 }
             }
@@ -718,7 +718,7 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
             }
             int unreadCount = item.optInt("unread_count", 0);
             if (unreadCount > 0) {
-                detail += "\\nНепрочитано: " + unreadCount;
+                detail += "\nНепрочитано: " + unreadCount;
             }
         }
 

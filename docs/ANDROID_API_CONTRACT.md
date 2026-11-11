@@ -56,6 +56,7 @@ The current Android overlay calls these API areas:
   - Direct messages: `POST /api/messages/{message_id}/reactions`.
   - Groups: `POST /api/groups/{group_id}/messages/{message_id}/reactions`.
   - Channels: `POST /api/channels/{channel_id}/messages/{message_id}/reactions`.
+- Cloud drafts: `GET /api/drafts?scope={dm|group|channel}&peer_id={id}`, `PUT /api/drafts` with `{scope, peer_id, body}`, and `DELETE /api/drafts` with the same query parameters. Drafts are private to their owner and scoped to a conversation; group and private-channel access is checked before reading or saving. The current Android draft store remains local until its client is wired to these endpoints.
 - Conversation change events: `GET /api/events` to get the current event cursor, then `GET /api/events?after_id={event_id}` for authorized edits, deletions, reaction changes and read markers. The Android chat/timeline clients check this cursor after each bounded message long-poll response and refresh only the open conversation when one of its messages changes.
 - Forward a direct message into another conversation: `POST /api/messages/{message_id}/forward` with `recipient_id` and optional `Idempotency-Key`. The server requires access to the source conversation and stores the original message/user attribution.
 - Search within a personal conversation: `GET /api/messages/search?with={peer_id}&q={text}` (up to 100 matches, scoped to the authenticated conversation).

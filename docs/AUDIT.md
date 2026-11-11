@@ -147,7 +147,7 @@ This section supersedes older completion statements above where they conflict wi
 
 - The Android app still relies on bounded HTTP long polling while a conversation is active. This is not WebSocket delivery and does not provide dependable background push notifications.
 - Video messages, animated media playback, voice/video calls, phone-book synchronization, and a hosted user-bot runtime remain incomplete.
-- Reactions are rendered as aggregate text counts; the client does not yet visually distinguish the current user's own reactions or receive a dedicated real-time update for changes to older messages made by other users.
+- Reactions are rendered as aggregate text counts; the client does not yet visually distinguish the current user's own reactions. Remote edits, deletions, reactions and read marks are now tracked in the authenticated event stream. An open chat or timeline checks that stream after each bounded message long-poll response, so changes to older messages refresh without waiting for a new message (typically within the current 20-second poll window). This is foreground synchronization, not push delivery.
 - The gift purchase route creates an internal WaysGram inventory record and charges internal WaysGram Stars. It does not transfer a Telegram collectible or on-chain NFT to a user's external wallet.
 - A completed CI build is not an installation test. The generated debug APK still needs package/signature verification, installation and functional testing on a device.
 - Production deployment and the public AuthBot host's health/proxy behavior have not been independently verified in this audit.

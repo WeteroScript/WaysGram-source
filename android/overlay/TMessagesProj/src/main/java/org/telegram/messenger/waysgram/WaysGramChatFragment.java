@@ -10,8 +10,6 @@ import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
-import android.text.Editable;
-import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -44,6 +42,7 @@ public final class WaysGramChatFragment extends BaseFragment {
     private final String peerTitle;
 
     private WaysGramApiClient apiClient;
+    private WaysGramCloudDraftSync cloudDraftSync;
     private LinearLayout messagesContainer;
     private EditText messageInput;
     private Button sendButton;
@@ -120,21 +119,8 @@ public final class WaysGramChatFragment extends BaseFragment {
         messageInput.setSingleLine(false);
         messageInput.setMaxLines(4);
         messageInput.setText(WaysGramDraftStore.load(context, "dm", peerId));
-        messageInput.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence value, int start, int count, int after) {
-            }
-
-            @Override
-            public void onTextChanged(CharSequence value, int start, int before, int count) {
-            }
-
-            @Override
-            public void afterTextChanged(Editable value) {
-                WaysGramDraftStore.save(getParentActivity(), "dm", peerId,
-                        value == null ? "" : value.toString());
-            }
-        });
+        cloudDraftSync = new WaysGramCloudDraftSync(context, apiClient, "dm", peerId, messageInput);
+        cloudDraftSync.start();
         composer.addView(messageInput, new LinearLayout.LayoutParams(
                 0,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -573,7 +559,7 @@ public final class WaysGramChatFragment extends BaseFragment {
         apiClient.post("/api/messages", payload, new WaysGramApiClient.Callback() {
             @Override
             public void onSuccess(JSONObject response) {
-                messageInput.setText("");
+                clearChatDraft();
                 statusView.setText("Изображение отправлено.");
                 loadMessages();
             }
@@ -945,7 +931,7 @@ public final class WaysGramChatFragment extends BaseFragment {
         apiClient.post("/api/messages", payload, new WaysGramApiClient.Callback() {
             @Override
             public void onSuccess(JSONObject response) {
-                messageInput.setText("");
+                clearChatDraft();
                 statusView.setText("Документ отправлен.");
                 loadMessages();
             }
@@ -955,6 +941,14 @@ public final class WaysGramChatFragment extends BaseFragment {
                 statusView.setText(message);
             }
         });
+    }
+
+    private void clearChatDraft() {
+        if (cloudDraftSync != null) {
+            cloudDraftSync.clear();
+        } else if (messageInput != null) {
+            messageInput.setText("");
+        }
     }
 
     private void setMessageSendInFlight(boolean inFlight) {
@@ -990,7 +984,7 @@ public final class WaysGramChatFragment extends BaseFragment {
             @Override
             public void onSuccess(JSONObject response) {
                 setMessageSendInFlight(false);
-                messageInput.setText("");
+                clearChatDraft();
                 replyToMessageId = 0;
                 statusView.setOnClickListener(null);
                 statusView.setText("Сообщение отправлено");
@@ -1021,6 +1015,9 @@ public final class WaysGramChatFragment extends BaseFragment {
     public void onPause() {
         isScreenResumed = false;
         pollHandler.removeCallbacks(pollRunnable);
+        if (cloudDraftSync != null) {
+            cloudDraftSync.flush();
+        }
         super.onPause();
     }
 
@@ -1028,6 +1025,10 @@ public final class WaysGramChatFragment extends BaseFragment {
     public void onFragmentDestroy() {
         isScreenResumed = false;
         pollHandler.removeCallbacks(pollRunnable);
+        if (cloudDraftSync != null) {
+            cloudDraftSync.close();
+            cloudDraftSync = null;
+        }
         forwardIdempotencyKeys.clear();
         if (apiClient != null) {
             apiClient.close();

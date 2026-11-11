@@ -19,11 +19,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Read-only WaysGram client for Telegram's bot-scoped gift catalog.
+ * WaysGram client for Telegram's bot-scoped gift catalog.
  *
  * The base URL and the WaysGram session token are supplied by the application.
  * No Telegram bot token or Telegram file_id is stored in this class or sent to
- * the Android client. Network callbacks run on this class's IO thread.
+ * the Android client. Catalog, sticker and purchase callbacks run on this
+ * class's IO thread.
  */
 public final class WaysGramGiftCatalogClient implements AutoCloseable {
     private static final int CONNECT_TIMEOUT_MS = 15000;

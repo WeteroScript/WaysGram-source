@@ -131,7 +131,12 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
         isScreenResumed = true;
         if (supportsDirectoryEvents()) {
             directoryEventHandler.removeCallbacks(directoryEventRetryRunnable);
-            initializeDirectoryEventCursor();
+            if (directoryEventsReady) {
+                loadItems();
+                checkDirectoryEvents();
+            } else {
+                initializeDirectoryEventCursor();
+            }
         }
     }
 
@@ -685,7 +690,7 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
                         if (note.length() > 120) {
                             note = note.substring(0, 120) + "…";
                         }
-                        detail += (detail.isEmpty() ? "" : "\\n") + "Заметка: " + note;
+                        detail += (detail.isEmpty() ? "" : "\n") + "Заметка: " + note;
                     }
                 }
             } else {
@@ -701,7 +706,7 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
             detail = item.optString("member_count", "0") + " участников";
             int unreadCount = item.optInt("unread_count", 0);
             if (unreadCount > 0) {
-                detail += "\\nНепрочитано: " + unreadCount;
+                detail += "\nНепрочитано: " + unreadCount;
             }
         } else {
             title = item.optString("title", "Канал " + id);

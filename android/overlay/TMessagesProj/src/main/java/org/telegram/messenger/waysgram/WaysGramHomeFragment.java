@@ -159,14 +159,14 @@ public final class WaysGramHomeFragment extends BaseFragment {
                 }
                 String profileText = name;
                 if (!currentUsername.isEmpty()) {
-                    profileText += "\\n@" + currentUsername;
+                    profileText += "\n@" + currentUsername;
                 }
                 String phone = response.optString("phone", "");
                 if (!phone.isEmpty()) {
-                    profileText += "\\n" + phone;
+                    profileText += "\n" + phone;
                 }
                 if (!currentBio.isEmpty()) {
-                    profileText += "\\n" + currentBio;
+                    profileText += "\n" + currentBio;
                 }
                 profileView.setText(profileText);
                 if (!avatarId.equals(currentAvatarMediaId)) {

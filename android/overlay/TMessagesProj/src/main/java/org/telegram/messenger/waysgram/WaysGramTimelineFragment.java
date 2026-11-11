@@ -615,7 +615,7 @@ public final class WaysGramTimelineFragment extends BaseFragment {
             return;
         }
         pollInFlight = true;
-        apiClient.get(basePath() + "?after_id=" + lastMessageId + "&wait_seconds=20", new WaysGramApiClient.Callback() {
+        apiClient.getLongPoll(basePath() + "?after_id=" + lastMessageId + "&wait_seconds=20", new WaysGramApiClient.Callback() {
             @Override
             public void onSuccess(JSONObject response) {
                 pollInFlight = false;

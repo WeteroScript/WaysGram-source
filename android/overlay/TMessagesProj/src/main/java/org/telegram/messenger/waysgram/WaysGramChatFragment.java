@@ -513,8 +513,12 @@ public final class WaysGramChatFragment extends BaseFragment {
                         : "Отправлено");
             }
         }
+        String reactionSummary = message.optString("reaction_summary", "");
+        if (!reactionSummary.isEmpty()) {
+            displayText += "\n" + reactionSummary.replace(",", " · ").replace(":", " ");
+        }
         row.setText(displayText);
-        row.setContentDescription("Удерживайте сообщение, чтобы ответить");
+        row.setContentDescription("Удерживайте сообщение, чтобы ответить или поставить реакцию");
         if (messageId > 0) {
             row.setOnLongClickListener(view -> {
                 showMessageActions(message);
@@ -573,20 +577,60 @@ public final class WaysGramChatFragment extends BaseFragment {
         if (messageId <= 0) {
             return;
         }
-        String[] actions = {"Ответить", "Редактировать", "Удалить", "Переслать"};
+        String[] actions = {"Ответить", "Реакция", "Редактировать", "Удалить", "Переслать"};
         new AlertDialog.Builder(getParentActivity())
                 .setItems(actions, (dialog, which) -> {
                     if (which == 0) {
                         setReplyTarget(messageId);
                     } else if (which == 1) {
-                        editMessage(messageId, message.optString("body", ""));
+                        showReactionPicker(messageId);
                     } else if (which == 2) {
-                        confirmDeleteMessage(messageId);
+                        editMessage(messageId, message.optString("body", ""));
                     } else if (which == 3) {
+                        confirmDeleteMessage(messageId);
+                    } else if (which == 4) {
                         chooseForwardRecipient(messageId);
                     }
                 })
                 .show();
+    }
+
+    private void showReactionPicker(long messageId) {
+        String[] reactions = {"👍", "❤️", "😂", "😮", "😢", "🎉", "🙏"};
+        new AlertDialog.Builder(getParentActivity())
+                .setTitle("Выберите реакцию")
+                .setItems(reactions, (dialog, which) -> {
+                    if (which >= 0 && which < reactions.length) {
+                        sendReaction("/api/messages/" + messageId + "/reactions", reactions[which]);
+                    }
+                })
+                .setNegativeButton("Отмена", null)
+                .show();
+    }
+
+    private void sendReaction(String path, String reaction) {
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("reaction", reaction);
+        } catch (Exception exception) {
+            statusView.setText("Не удалось подготовить реакцию");
+            return;
+        }
+        statusView.setText("Сохраняю реакцию…");
+        apiClient.post(path, payload, new WaysGramApiClient.Callback() {
+            @Override
+            public void onSuccess(JSONObject response) {
+                statusView.setText("Реакция " + (response.optString("status").equals("removed")
+                        ? "удалена"
+                        : "добавлена"));
+                loadMessages();
+            }
+
+            @Override
+            public void onError(String message, int statusCode) {
+                statusView.setText(message);
+            }
+        });
     }
 
     private void chooseForwardRecipient(long messageId) {

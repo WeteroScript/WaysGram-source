@@ -45,6 +45,12 @@ https://bot-1793554244-6434-weterochina.bothost.tech
 - `.github/workflows/source-check.yml` проверяет скрипты и контракт исходников.
 - `.github/workflows/android-apk.yml` содержит отдельный workflow сборки debug APK. Сам факт наличия workflow не является подтверждением успешной сборки; ориентироваться нужно на результат конкретного запуска.
 
+## Аналитика и мониторинг
+
+Android REST overlay поддерживает PostHog EU для агрегированных событий и исключений. Для сборки задайте `POSTHOG_API_KEY` и `POSTHOG_HOST=https://eu.i.posthog.com`; GitHub Actions читает токен из repository secret `POSTHOG_API_KEY`. Без этих переменных сборка и запуск остаются доступны, но события не отправляются. Содержимое сообщений, номера, идентификаторы аккаунтов, токены и ссылки приглашений не передаются.
+
+Инструкция и границы сбора данных: [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md).
+
 ## Секреты
 
 `BOT_TOKEN`, `INTERNAL_API_TOKEN`, `OTP_FERNET_KEY`, ключи подписи APK и пароли сервера должны храниться только в переменных окружения или GitHub Secrets и не должны попадать в Git.

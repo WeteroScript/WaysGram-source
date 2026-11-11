@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Configure the WaysGram application identity without modifying Telegram UI or services.
+"""Configure the WaysGram application identity and optional PostHog SDK."""
 
-The upstream Telegram API settings, Google service integration, debug manifest,
-launcher resources, permissions, and runtime behavior are left untouched.
-"""
 from __future__ import annotations
 
 import argparse
+import json
+import os
 import re
 from pathlib import Path
+from urllib.parse import urlsplit
 
 
 def replace_one(pattern: str, replacement: str, content: str, label: str) -> str:
@@ -49,6 +49,83 @@ def patch_string_resources(android_root: Path) -> None:
         raise ValueError("AppName/AppNameBeta resources were not found")
 
 
+def configure_posthog_module(android_root: Path) -> None:
+    module_gradle = android_root / "TMessagesProj/build.gradle"
+    if not module_gradle.is_file():
+        raise FileNotFoundError(f"Telegram library Gradle file not found: {module_gradle}")
+
+    content = module_gradle.read_text(encoding="utf-8")
+    if "com.posthog:posthog-android:" not in content:
+        dependency_pattern = re.compile(r"^dependencies \{$", flags=re.MULTILINE)
+        content, count = dependency_pattern.subn(
+            lambda match: match.group(0) + "\n    implementation 'com.posthog:posthog-android:3.+'",
+            content,
+            count=1,
+        )
+        if count != 1:
+            raise ValueError("Could not add the PostHog Android SDK dependency")
+
+    values = {
+        "WAYS_GRAM_POSTHOG_API_KEY": os.getenv("POSTHOG_API_KEY", "").strip(),
+        "WAYS_GRAM_POSTHOG_HOST": os.getenv("POSTHOG_HOST", "").strip(),
+    }
+    for field_name, value in values.items():
+        line = (
+            f'        buildConfigField "String", "{field_name}", '
+            f'{json.dumps(json.dumps(value))}'
+        )
+        field_pattern = re.compile(
+            r'^\s*buildConfigField "String", "' + re.escape(field_name) + r'", .*?$',
+            flags=re.MULTILINE,
+        )
+        content, count = field_pattern.subn(lambda _match: line, content, count=1)
+        if count == 0:
+            default_config_pattern = re.compile(r"^    defaultConfig \{$", flags=re.MULTILINE)
+            content, inserted = default_config_pattern.subn(
+                lambda match: match.group(0) + "\n" + line,
+                content,
+                count=1,
+            )
+            if inserted != 1:
+                raise ValueError("Could not add PostHog BuildConfig fields to TMessagesProj")
+
+    module_gradle.write_text(content, encoding="utf-8")
+
+
+def configure_default_api_base_url(android_root: Path) -> None:
+    value = os.getenv("WAYSGRAM_API_BASE_URL", "").strip().rstrip("/")
+    if not value:
+        return
+
+    parsed = urlsplit(value)
+    if (
+        parsed.scheme not in {"http", "https"}
+        or not parsed.netloc
+        or parsed.path not in {"", "/"}
+        or parsed.query
+        or parsed.fragment
+        or parsed.username
+        or parsed.password
+    ):
+        raise ValueError("WAYSGRAM_API_BASE_URL must be an absolute HTTP(S) origin")
+
+    login_sheet = (
+        android_root
+        / "TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramLoginSheet.java"
+    )
+    if not login_sheet.is_file():
+        raise FileNotFoundError(f"WaysGram login sheet not found: {login_sheet}")
+
+    content = login_sheet.read_text(encoding="utf-8")
+    content = replace_one(
+        r'^    private static final String DEFAULT_API_BASE_URL = .*;$',
+        f"    private static final String DEFAULT_API_BASE_URL = {json.dumps(value)};",
+        content,
+        "WaysGram default API base URL",
+    )
+    login_sheet.write_text(content, encoding="utf-8")
+
+
 def configure_android_root(android_root: Path) -> None:
     if not (android_root / "gradlew").is_file():
         raise FileNotFoundError(f"Android Gradle wrapper not found in {android_root}")
@@ -62,12 +139,14 @@ def configure_android_root(android_root: Path) -> None:
         "Android application ID",
     )
     gradle_properties.write_text(content, encoding="utf-8")
+    configure_posthog_module(android_root)
+    configure_default_api_base_url(android_root)
     patch_string_resources(android_root)
 
     print(
-        "Configured WaysGram application label while retaining the upstream Firebase-compatible package. "
-        "Original Telegram UI, launcher icon, API settings, Google services, "
-        "permissions, and manifest declarations were preserved."
+        "Configured WaysGram application identity and optional PostHog Android SDK. "
+        "PostHog capture is enabled only when POSTHOG_API_KEY and POSTHOG_HOST are set. "
+        "WAYSGRAM_API_BASE_URL overrides the login screen API default when configured."
     )
 
 

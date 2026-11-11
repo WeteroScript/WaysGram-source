@@ -22,6 +22,10 @@ class AndroidDevBuildConfigurationTests(unittest.TestCase):
             '<string name="AppNameBeta">Telegram Beta</string></resources>',
             encoding="utf-8",
         )
+        (root / "TMessagesProj/build.gradle").write_text(
+            "dependencies {\n}\n\nandroid {\n    defaultConfig {\n        minSdkVersion 23\n    }\n}\n",
+            encoding="utf-8",
+        )
         (root / "TMessagesProj_App").mkdir()
         (root / "TMessagesProj_App/build.gradle").write_text("unchanged build file\n", encoding="utf-8")
         (root / "TMessagesProj/src/main/java/org/telegram/messenger/BuildVars.java").write_text(
@@ -56,8 +60,10 @@ class AndroidDevBuildConfigurationTests(unittest.TestCase):
             self.make_project(root)
             configure_android_root(root)
             first = (root / "TMessagesProj/src/main/res/values/strings.xml").read_text(encoding="utf-8")
+            first_gradle = (root / "TMessagesProj/build.gradle").read_text(encoding="utf-8")
             configure_android_root(root)
             self.assertEqual(first, (root / "TMessagesProj/src/main/res/values/strings.xml").read_text(encoding="utf-8"))
+            self.assertEqual(first_gradle, (root / "TMessagesProj/build.gradle").read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

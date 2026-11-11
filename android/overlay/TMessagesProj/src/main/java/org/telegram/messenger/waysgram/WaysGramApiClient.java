@@ -51,6 +51,7 @@ public final class WaysGramApiClient implements AutoCloseable {
             } catch (ApiException exception) {
                 deliverError(callback, exception.getMessage(), exception.statusCode);
             } catch (Exception exception) {
+                WaysGramTelemetry.captureException(exception, "document_upload");
                 deliverError(callback, "Не удалось загрузить документ", 0);
             }
         });
@@ -65,6 +66,7 @@ public final class WaysGramApiClient implements AutoCloseable {
             } catch (ApiException exception) {
                 deliverError(callback, exception.getMessage(), exception.statusCode);
             } catch (Exception exception) {
+                WaysGramTelemetry.captureException(exception, "document_download");
                 deliverError(callback, "Не удалось сохранить документ", 0);
             }
         });
@@ -110,6 +112,7 @@ public final class WaysGramApiClient implements AutoCloseable {
             } catch (ApiException exception) {
                 deliverError(callback, exception.getMessage(), exception.statusCode);
             } catch (Exception exception) {
+                WaysGramTelemetry.captureException(exception, "image_upload");
                 deliverError(callback, "Не удалось загрузить изображение", 0);
             }
         });
@@ -127,6 +130,7 @@ public final class WaysGramApiClient implements AutoCloseable {
             } catch (ApiException exception) {
                 deliverImageError(callback, exception.getMessage(), exception.statusCode);
             } catch (Exception exception) {
+                WaysGramTelemetry.captureException(exception, "image_download");
                 deliverImageError(callback, "Не удалось загрузить изображение", 0);
             }
         });
@@ -136,10 +140,13 @@ public final class WaysGramApiClient implements AutoCloseable {
         ioExecutor.execute(() -> {
             try {
                 JSONObject response = request(method, path, payload);
+                WaysGramTelemetry.captureApiAction(method, path);
                 deliverSuccess(callback, response);
             } catch (ApiException exception) {
+                WaysGramTelemetry.captureApiFailure(method, path, exception.statusCode);
                 deliverError(callback, exception.getMessage(), exception.statusCode);
             } catch (Exception exception) {
+                WaysGramTelemetry.captureException(exception, "api_request");
                 deliverError(callback, "Не удалось связаться с сервером WaysGram", 0);
             }
         });

@@ -158,6 +158,7 @@ public final class WaysGramChatFragment extends BaseFragment {
                 }
                 lastMessageId = newestId;
                 statusView.setText(count == 0 ? "История пока пуста" : "Сообщений: " + count);
+                markMessagesRead();
                 scheduleNextPoll();
             }
 
@@ -169,6 +170,34 @@ public final class WaysGramChatFragment extends BaseFragment {
                     presentFragment(new WaysGramLoginFragment(), true);
                 } else {
                     scheduleNextPoll();
+                }
+            }
+        });
+    }
+
+    private void markMessagesRead() {
+        if (apiClient == null || lastMessageId <= 0) {
+            return;
+        }
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("scope", "dm");
+            payload.put("peer_id", peerId);
+            payload.put("last_read_id", lastMessageId);
+        } catch (Exception exception) {
+            return;
+        }
+        apiClient.put("/api/read", payload, new WaysGramApiClient.Callback() {
+            @Override
+            public void onSuccess(JSONObject response) {
+                // Read markers are background state; keep the chat status unchanged.
+            }
+
+            @Override
+            public void onError(String message, int statusCode) {
+                if (statusCode == 401 && getParentActivity() != null) {
+                    WaysGramSessionStore.getInstance(getParentActivity()).clearSession();
+                    presentFragment(new WaysGramLoginFragment(), true);
                 }
             }
         });
@@ -209,6 +238,7 @@ public final class WaysGramChatFragment extends BaseFragment {
                         }
                         if (count > 0) {
                             statusView.setText("Новые сообщения: " + count);
+                            markMessagesRead();
                         }
                         scheduleNextPoll();
                     }

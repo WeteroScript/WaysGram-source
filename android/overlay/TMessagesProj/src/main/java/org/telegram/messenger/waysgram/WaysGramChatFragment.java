@@ -374,7 +374,7 @@ public final class WaysGramChatFragment extends BaseFragment {
         long messageId = message.optLong("id", 0);
         long repliedToId = message.optLong("reply_to_id", 0);
         String body = prefix + message.optString("body", "");
-        row.setText(repliedToId > 0 ? "Ответ на сообщение #" + repliedToId + "\\n" + body : body);
+        row.setText(repliedToId > 0 ? "Ответ на сообщение #" + repliedToId + "\n" + body : body);
         row.setContentDescription("Удерживайте сообщение, чтобы ответить");
         if (messageId > 0) {
             row.setOnLongClickListener(view -> {

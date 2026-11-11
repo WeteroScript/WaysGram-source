@@ -25,6 +25,10 @@ import org.telegram.messenger.AndroidUtilities;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
 
+import java.text.DateFormat;
+import java.util.Date;
+import java.util.Locale;
+
 /** WaysGram direct text conversation backed by /api/messages. */
 public final class WaysGramChatFragment extends BaseFragment {
     private static final int REQUEST_ATTACHMENT = 7101;
@@ -47,6 +51,7 @@ public final class WaysGramChatFragment extends BaseFragment {
         }
     };
     private long lastMessageId = 0;
+    private long peerReadMessageId = 0;
     private boolean pollInFlight = false;
     private boolean isScreenResumed = false;
     private String pendingSaveMediaId;
@@ -147,6 +152,7 @@ public final class WaysGramChatFragment extends BaseFragment {
         apiClient.get("/api/messages?with=" + peerId, new WaysGramApiClient.Callback() {
             @Override
             public void onSuccess(JSONObject response) {
+                peerReadMessageId = response.optLong("peer_read_id", peerReadMessageId);
                 JSONArray messages = response.optJSONArray("messages");
                 messagesContainer.removeAllViews();
                 int count = messages == null ? 0 : messages.length();
@@ -226,6 +232,12 @@ public final class WaysGramChatFragment extends BaseFragment {
                     @Override
                     public void onSuccess(JSONObject response) {
                         pollInFlight = false;
+                        long latestPeerReadId = response.optLong("peer_read_id", peerReadMessageId);
+                        if (latestPeerReadId > peerReadMessageId) {
+                            peerReadMessageId = latestPeerReadId;
+                            loadMessages();
+                            return;
+                        }
                         JSONArray messages = response.optJSONArray("messages");
                         int count = messages == null ? 0 : messages.length();
                         for (int i = 0; i < count; i++) {
@@ -375,7 +387,21 @@ public final class WaysGramChatFragment extends BaseFragment {
         long messageId = message.optLong("id", 0);
         long repliedToId = message.optLong("reply_to_id", 0);
         String body = prefix + message.optString("body", "");
-        row.setText(repliedToId > 0 ? "Ответ на сообщение #" + repliedToId + "\n" + body : body);
+        String displayText = repliedToId > 0
+                ? "Ответ на сообщение #" + repliedToId + "\n" + body
+                : body;
+        long createdAt = message.optLong("created_at", 0);
+        if (createdAt > 0) {
+            String time = DateFormat.getTimeInstance(DateFormat.SHORT, Locale.getDefault())
+                    .format(new Date(createdAt * 1000L));
+            displayText += "\n" + time;
+            if (sender != peerId) {
+                displayText += " · " + (messageId > 0 && messageId <= peerReadMessageId
+                        ? "Прочитано"
+                        : "Отправлено");
+            }
+        }
+        row.setText(displayText);
         row.setContentDescription("Удерживайте сообщение, чтобы ответить");
         if (messageId > 0) {
             row.setOnLongClickListener(view -> {

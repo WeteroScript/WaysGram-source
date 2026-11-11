@@ -2,6 +2,8 @@ package org.telegram.messenger.waysgram;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
@@ -954,6 +956,21 @@ public final class WaysGramTimelineFragment extends BaseFragment {
         }
     }
 
+    private void copyMessageText(String body) {
+        if (body == null || body.isEmpty()) {
+            statusView.setText("В сообщении нет текста для копирования");
+            return;
+        }
+        ClipboardManager clipboard = (ClipboardManager) getParentActivity()
+                .getSystemService(Context.CLIPBOARD_SERVICE);
+        if (clipboard == null) {
+            statusView.setText("Буфер обмена недоступен");
+            return;
+        }
+        clipboard.setPrimaryClip(ClipData.newPlainText("WaysGram message", body));
+        statusView.setText("Текст сообщения скопирован");
+    }
+
     private void showReactionPicker(long messageId) {
         String[] reactions = {"👍", "❤️", "😂", "😮", "😢", "🎉", "🙏"};
         new AlertDialog.Builder(getParentActivity())
@@ -1001,7 +1018,7 @@ public final class WaysGramTimelineFragment extends BaseFragment {
         if (messageId <= 0) {
             return;
         }
-        String[] actions = {"Ответить", "Реакция", "Редактировать", "Удалить"};
+        String[] actions = {"Ответить", "Реакция", "Копировать", "Редактировать", "Удалить"};
         new AlertDialog.Builder(getParentActivity())
                 .setItems(actions, (dialog, which) -> {
                     if (which == 0) {
@@ -1009,8 +1026,10 @@ public final class WaysGramTimelineFragment extends BaseFragment {
                     } else if (which == 1) {
                         showReactionPicker(messageId);
                     } else if (which == 2) {
-                        editMessage(messageId, message.optString("body", ""));
+                        copyMessageText(message.optString("body", ""));
                     } else if (which == 3) {
+                        editMessage(messageId, message.optString("body", ""));
+                    } else if (which == 4) {
                         confirmDeleteMessage(messageId);
                     }
                 })

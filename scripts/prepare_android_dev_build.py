@@ -92,7 +92,6 @@ def configure_posthog_module(android_root: Path) -> None:
     module_gradle.write_text(content, encoding="utf-8")
 
 
-
 def configure_default_api_base_url(android_root: Path) -> None:
     value = os.getenv("WAYSGRAM_API_BASE_URL", "").strip().rstrip("/")
     if not value:
@@ -119,39 +118,7 @@ def configure_default_api_base_url(android_root: Path) -> None:
 
     content = login_sheet.read_text(encoding="utf-8")
     content = replace_one(
-        r'^    private static final String DEFAULT_API_BASE_URL = .*;    if not (android_root / "gradlew").is_file():
-        raise FileNotFoundError(f"Android Gradle wrapper not found in {android_root}")
-
-    gradle_properties = android_root / "gradle.properties"
-    content = gradle_properties.read_text(encoding="utf-8")
-    content = replace_one(
-        r"^APP_PACKAGE=.*$",
-        "APP_PACKAGE=org.telegram.messenger",
-        content,
-        "Android application ID",
-    )
-    gradle_properties.write_text(content, encoding="utf-8")
-    configure_posthog_module(android_root)
-    configure_default_api_base_url(android_root)
-    patch_string_resources(android_root)
-
-    print(
-        "Configured WaysGram application identity and optional PostHog Android SDK. "
-        "PostHog capture is enabled only when POSTHOG_API_KEY and POSTHOG_HOST are set. "
-        "WAYSGRAM_API_BASE_URL overrides the login screen API default when configured."
-    )
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--android-root", required=True, type=Path)
-    args = parser.parse_args()
-    configure_android_root(args.android_root)
-
-
-if __name__ == "__main__":
-    main()
-,
+        r'^    private static final String DEFAULT_API_BASE_URL = .*;$',
         f"    private static final String DEFAULT_API_BASE_URL = {json.dumps(value)};",
         content,
         "WaysGram default API base URL",
@@ -173,11 +140,13 @@ def configure_android_root(android_root: Path) -> None:
     )
     gradle_properties.write_text(content, encoding="utf-8")
     configure_posthog_module(android_root)
+    configure_default_api_base_url(android_root)
     patch_string_resources(android_root)
 
     print(
         "Configured WaysGram application identity and optional PostHog Android SDK. "
-        "PostHog capture is enabled only when POSTHOG_API_KEY and POSTHOG_HOST are set."
+        "PostHog capture is enabled only when POSTHOG_API_KEY and POSTHOG_HOST are set. "
+        "WAYSGRAM_API_BASE_URL overrides the login screen API default when configured."
     )
 
 

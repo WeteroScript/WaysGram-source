@@ -150,6 +150,7 @@ jobs:
           grep -q 'apiClient.put("/api/typing"' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTypingIndicatorController.java
           grep -q 'apiClient.get(queryPath()' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTypingIndicatorController.java
           grep -q 'STOP_DELAY_MS = 2500L' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTypingIndicatorController.java
+          grep -q 'input.hasFocus()' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTypingIndicatorController.java
           grep -q 'new WaysGramTypingIndicatorController' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramChatFragment.java
           grep -q 'new WaysGramTypingIndicatorController' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramTimelineFragment.java
           grep -q 'typingIndicatorController.startPolling()' android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramChatFragment.java

@@ -46,6 +46,7 @@ public final class WaysGramGiftCatalogSheet extends BottomSheet {
     private final WaysGramGiftCatalogClient catalogClient;
     private final Theme.ResourcesProvider resourcesProvider;
     private final GiftAdapter adapter;
+    private final Runnable onPurchaseComplete;
 
     private TextView statusView;
     private ProgressBar progressBar;
@@ -56,8 +57,18 @@ public final class WaysGramGiftCatalogSheet extends BottomSheet {
             WaysGramGiftCatalogClient.SessionProvider sessionProvider,
             @Nullable Theme.ResourcesProvider resourcesProvider
     ) {
+        this(context, sessionProvider, resourcesProvider, null);
+    }
+
+    public WaysGramGiftCatalogSheet(
+            Context context,
+            WaysGramGiftCatalogClient.SessionProvider sessionProvider,
+            @Nullable Theme.ResourcesProvider resourcesProvider,
+            @Nullable Runnable onPurchaseComplete
+    ) {
         super(context, false, resourcesProvider);
         this.resourcesProvider = resourcesProvider;
+        this.onPurchaseComplete = onPurchaseComplete;
         catalogClient = new WaysGramGiftCatalogClient(sessionProvider);
         adapter = new GiftAdapter();
 
@@ -194,6 +205,9 @@ public final class WaysGramGiftCatalogSheet extends BottomSheet {
                                 statusView.setText(confirmation);
                                 Toast.makeText(getContext(), confirmation, Toast.LENGTH_LONG).show();
                                 loadCatalog();
+                                if (onPurchaseComplete != null) {
+                                    onPurchaseComplete.run();
+                                }
                             });
                         }
 

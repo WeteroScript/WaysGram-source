@@ -116,3 +116,39 @@ GitHub Actions test runs for the latest AuthBot changes are linked from the repo
 7. Add Android build CI and perform APK build/install tests only after the source/API integration milestones are complete.
 
 Stake-based auction functionality is not part of the Android integration milestone. The client marketplace scope should use fixed-price listings and inventory operations.
+
+## 9. Progress update — 2026-11-11
+
+This section supersedes older completion statements above where they conflict with the current `main` branches.
+
+### Verified in WaysGram Android `main`
+
+- WaysGram login and session handling through AuthBot remain in the Android overlay.
+- Profile editing covers display name, username and bio. The profile screen can upload, display and remove an avatar.
+- Contacts can be searched and managed manually. Phone-book synchronization is not implemented.
+- Block-list management is available.
+- Direct-message forwarding preserves the original sender/message attribution through AuthBot.
+- Direct messages, groups and channels have local device-side drafts. Draft keys are namespaced by a SHA-256 digest of the WaysGram session token. Reply history includes a quoted-text preview.
+- Long-press message actions include reactions and copy-text in direct chats, groups and channels. The client displays aggregate reaction counts; the backend allows the sender/recipient or a chat member with access to react, supports seven fixed reactions, and limits a user to three distinct reactions per message.
+- The Telegram gift storefront in Android exposes catalogue viewing, purchase confirmation and purchase into the WaysGram inventory. The app does not expose administrator price or stock editing.
+- Android source checks passed for the current integration. A universal debug APK build was started from `main`; until the workflow finishes its package-identity check and artifact upload, there is no verified APK artifact for this revision.
+
+### Verified in AuthBot `main`
+
+- The AuthBot Telegram admin panel can add a synchronized Telegram gift to its management list by Telegram Gift ID, then configure sale price and stock.
+- The user-facing purchase API takes its configured price and stock from the server-side admin listing. It has no user-facing price/stock administration route.
+- Gift purchase is idempotent when the client supplies an idempotency key. The app's purchase request does not control the authoritative price or supply.
+- Profile update and avatar upload/set/remove routes are present. Avatar assignment is limited to an image uploaded by the same account.
+- Reaction routes exist for direct messages, groups and channels, with message/chat access validation, toggle-off behavior and a three-reaction-per-user limit.
+- Regression tests cover reaction authorization/limits, avatar ownership isolation, Telegram Gift ID admin addition, gift purchase, and the fact that client-supplied price/stock fields do not override admin settings.
+- AuthBot Python 3.11/3.12 CI passed for the reaction and avatar regression-test additions. A further CI run was started for the price/stock tampering regression test.
+
+### Remaining integration and product gaps
+
+- The Android app still relies on bounded HTTP long polling while a conversation is active. This is not WebSocket delivery and does not provide dependable background push notifications.
+- Video messages, animated media playback, voice/video calls, phone-book synchronization, and a hosted user-bot runtime remain incomplete.
+- Reactions are rendered as aggregate text counts; the client does not yet visually distinguish the current user's own reactions or receive a dedicated real-time update for changes to older messages made by other users.
+- The gift purchase route creates an internal WaysGram inventory record and charges internal WaysGram Stars. It does not transfer a Telegram collectible or on-chain NFT to a user's external wallet.
+- A completed CI build is not an installation test. The generated debug APK still needs package/signature verification, installation and functional testing on a device.
+- Production deployment and the public AuthBot host's health/proxy behavior have not been independently verified in this audit.
+

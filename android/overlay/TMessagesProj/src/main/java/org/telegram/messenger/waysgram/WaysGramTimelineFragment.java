@@ -53,6 +53,7 @@ public final class WaysGramTimelineFragment extends BaseFragment {
     };
     private long lastMessageId = 0;
     private boolean pollInFlight = false;
+    private boolean sendInFlight = false;
     private boolean isScreenResumed = false;
     private String pendingSaveMediaId;
     private Button managementActionButton;
@@ -282,15 +283,10 @@ public final class WaysGramTimelineFragment extends BaseFragment {
         }
         String mimeType = getParentActivity().getContentResolver().getType(uri);
         statusView.setText("Загружаю вложение…");
-        if (attachButton != null) {
-            attachButton.setEnabled(false);
-        }
+        setSendInFlight(true);
         WaysGramApiClient.Callback uploadCallback = new WaysGramApiClient.Callback() {
             @Override
             public void onSuccess(JSONObject response) {
-                if (attachButton != null) {
-                    attachButton.setEnabled(true);
-                }
                 String mediaId = response.optString("id", "");
                 if (mimeType != null && mimeType.startsWith("image/")) {
                     sendImage(mediaId);
@@ -301,9 +297,7 @@ public final class WaysGramTimelineFragment extends BaseFragment {
 
             @Override
             public void onError(String message, int statusCode) {
-                if (attachButton != null) {
-                    attachButton.setEnabled(true);
-                }
+                setSendInFlight(false);
                 statusView.setText(message);
             }
         };
@@ -314,8 +308,19 @@ public final class WaysGramTimelineFragment extends BaseFragment {
         }
     }
 
+    private void setSendInFlight(boolean inFlight) {
+        sendInFlight = inFlight;
+        if (sendButton != null) {
+            sendButton.setEnabled(!inFlight);
+        }
+        if (attachButton != null) {
+            attachButton.setEnabled(!inFlight);
+        }
+    }
+
     private void sendImage(String mediaId) {
         if (mediaId == null || !mediaId.matches("[a-f0-9]{32}")) {
+            setSendInFlight(false);
             statusView.setText("Сервер вернул некорректный ID изображения.");
             return;
         }
@@ -327,23 +332,24 @@ public final class WaysGramTimelineFragment extends BaseFragment {
             payload.put("body", caption.length() == 0 ? "Изображение" : caption);
             payload.put("media_id", mediaId);
         } catch (Exception exception) {
+            setSendInFlight(false);
             statusView.setText("Не удалось подготовить изображение к отправке.");
             return;
         }
-        sendButton.setEnabled(false);
+        setSendInFlight(true);
         statusView.setText(type == TYPE_GROUP ? "Отправляю изображение в группу…" : "Публикую изображение…");
         apiClient.post(basePath(), payload, new WaysGramApiClient.Callback() {
             @Override
             public void onSuccess(JSONObject response) {
                 messageInput.setText("");
-                sendButton.setEnabled(true);
+                setSendInFlight(false);
                 statusView.setText(type == TYPE_GROUP ? "Изображение отправлено." : "Изображение опубликовано.");
                 loadMessages();
             }
 
             @Override
             public void onError(String message, int statusCode) {
-                sendButton.setEnabled(true);
+                setSendInFlight(false);
                 statusView.setText(message);
                 if (statusCode == 401) {
                     WaysGramSessionStore.getInstance(getParentActivity()).clearSession();
@@ -860,6 +866,7 @@ public final class WaysGramTimelineFragment extends BaseFragment {
 
     private void sendDocument(String mediaId) {
         if (mediaId == null || !mediaId.matches("[a-f0-9]{32}")) {
+            setSendInFlight(false);
             statusView.setText("Сервер вернул некорректный ID документа.");
             return;
         }
@@ -869,23 +876,24 @@ public final class WaysGramTimelineFragment extends BaseFragment {
             payload.put("body", caption);
             payload.put("media_id", mediaId);
         } catch (Exception exception) {
+            setSendInFlight(false);
             statusView.setText("Не удалось подготовить документ к отправке.");
             return;
         }
-        sendButton.setEnabled(false);
+        setSendInFlight(true);
         statusView.setText(type == TYPE_GROUP ? "Отправляю документ в группу…" : "Публикую документ…");
         apiClient.post(basePath(), payload, new WaysGramApiClient.Callback() {
             @Override
             public void onSuccess(JSONObject response) {
                 messageInput.setText("");
-                sendButton.setEnabled(true);
+                setSendInFlight(false);
                 statusView.setText(type == TYPE_GROUP ? "Документ отправлен." : "Документ опубликован.");
                 loadMessages();
             }
 
             @Override
             public void onError(String message, int statusCode) {
-                sendButton.setEnabled(true);
+                setSendInFlight(false);
                 statusView.setText(message);
                 if (statusCode == 401) {
                     WaysGramSessionStore.getInstance(getParentActivity()).clearSession();
@@ -896,6 +904,9 @@ public final class WaysGramTimelineFragment extends BaseFragment {
     }
 
     private void sendMessage() {
+        if (sendInFlight) {
+            return;
+        }
         String body = messageInput.getText() == null ? "" : messageInput.getText().toString().trim();
         if (body.length() == 0 || body.length() > 4000) {
             statusView.setText("Сообщение должно содержать от 1 до 4000 символов");
@@ -908,20 +919,20 @@ public final class WaysGramTimelineFragment extends BaseFragment {
             statusView.setText("Не удалось подготовить сообщение");
             return;
         }
-        sendButton.setEnabled(false);
+        setSendInFlight(true);
         statusView.setText(type == TYPE_GROUP ? "Отправляю…" : "Публикую…");
         apiClient.post(basePath(), payload, new WaysGramApiClient.Callback() {
             @Override
             public void onSuccess(JSONObject response) {
                 messageInput.setText("");
-                sendButton.setEnabled(true);
+                setSendInFlight(false);
                 statusView.setText(type == TYPE_GROUP ? "Сообщение отправлено" : "Публикация создана");
                 loadMessages();
             }
 
             @Override
             public void onError(String message, int statusCode) {
-                sendButton.setEnabled(true);
+                setSendInFlight(false);
                 statusView.setText(message);
             }
         });

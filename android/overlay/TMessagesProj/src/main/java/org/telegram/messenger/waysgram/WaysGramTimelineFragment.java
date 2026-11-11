@@ -154,6 +154,15 @@ public final class WaysGramTimelineFragment extends BaseFragment {
             loadManagement();
         });
 
+        Button searchButton = new Button(context);
+        searchButton.setText("Поиск по сообщениям");
+        searchButton.setAllCaps(false);
+        root.addView(searchButton, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+        searchButton.setOnClickListener(view -> showMessageSearchDialog());
+
         fragmentView = root;
         loadManagement();
         loadMessages();
@@ -359,6 +368,81 @@ public final class WaysGramTimelineFragment extends BaseFragment {
                 }
             }
         });
+    }
+
+    private void showMessageSearchDialog() {
+        EditText queryInput = new EditText(getParentActivity());
+        queryInput.setSingleLine(true);
+        queryInput.setHint("Текст сообщения или публикации");
+        new AlertDialog.Builder(getParentActivity())
+                .setTitle(type == TYPE_GROUP ? "Поиск по группе" : "Поиск по каналу")
+                .setView(queryInput)
+                .setNegativeButton("Отмена", null)
+                .setPositiveButton("Найти", (dialog, which) -> {
+                    String query = queryInput.getText() == null
+                            ? ""
+                            : queryInput.getText().toString().trim();
+                    if (query.isEmpty()) {
+                        statusView.setText("Введите текст для поиска");
+                        return;
+                    }
+                    if (query.length() > 128) {
+                        statusView.setText("Запрос не должен превышать 128 символов");
+                        return;
+                    }
+                    statusView.setText("Ищу сообщения…");
+                    apiClient.get(basePath() + "/search?q=" + Uri.encode(query),
+                            new WaysGramApiClient.Callback() {
+                                @Override
+                                public void onSuccess(JSONObject response) {
+                                    JSONArray messages = response.optJSONArray("messages");
+                                    int count = messages == null ? 0 : messages.length();
+                                    if (count == 0) {
+                                        statusView.setText("Совпадений не найдено");
+                                        new AlertDialog.Builder(getParentActivity())
+                                                .setTitle("Результаты поиска")
+                                                .setMessage("По запросу «" + query + "» ничего не найдено.")
+                                                .setPositiveButton("Закрыть", null)
+                                                .show();
+                                        return;
+                                    }
+                                    StringBuilder results = new StringBuilder();
+                                    int displayCount = Math.min(count, 20);
+                                    String senderKey = type == TYPE_GROUP ? "sender_id" : "author_id";
+                                    for (int i = 0; i < displayCount; i++) {
+                                        JSONObject message = messages.optJSONObject(i);
+                                        if (message == null) {
+                                            continue;
+                                        }
+                                        if (results.length() > 0) {
+                                            results.append("\n\n");
+                                        }
+                                        results.append("@").append(message.optLong(senderKey, 0));
+                                        results.append("\n").append(message.optString("body", ""));
+                                    }
+                                    if (count > displayCount) {
+                                        results.append("\n\nПоказаны первые ").append(displayCount)
+                                                .append(" из ").append(count).append(" совпадений.");
+                                    }
+                                    statusView.setText("Найдено сообщений: " + count);
+                                    new AlertDialog.Builder(getParentActivity())
+                                            .setTitle("Результаты поиска · " + count)
+                                            .setMessage(results.toString())
+                                            .setPositiveButton("Закрыть", null)
+                                            .show();
+                                }
+
+                                @Override
+                                public void onError(String message, int statusCode) {
+                                    statusView.setText(message);
+                                    if (statusCode == 401) {
+                                        WaysGramSessionStore.getInstance(getParentActivity()).clearSession();
+                                        presentFragment(new WaysGramLoginFragment(), true);
+                                    }
+                                }
+                            });
+                })
+                .show();
     }
 
     private void loadMessages() {

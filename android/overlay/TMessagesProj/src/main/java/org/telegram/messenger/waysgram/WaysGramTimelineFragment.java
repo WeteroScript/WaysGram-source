@@ -54,6 +54,7 @@ public final class WaysGramTimelineFragment extends BaseFragment {
     private long lastMessageId = 0;
     private boolean pollInFlight = false;
     private boolean sendInFlight = false;
+    private long replyToMessageId = 0;
     private boolean isScreenResumed = false;
     private String pendingSaveMediaId;
     private Button managementActionButton;
@@ -803,7 +804,17 @@ public final class WaysGramTimelineFragment extends BaseFragment {
         String senderKey = type == TYPE_GROUP ? "sender_id" : "author_id";
         long sender = message.optLong(senderKey, 0);
         String prefix = "@" + sender + ": ";
-        row.setText(prefix + message.optString("body", ""));
+        long messageId = message.optLong("id", 0);
+        long repliedToId = message.optLong("reply_to_id", 0);
+        String body = prefix + message.optString("body", "");
+        row.setText(repliedToId > 0 ? "Ответ на сообщение #" + repliedToId + "\\n" + body : body);
+        row.setContentDescription("Удерживайте сообщение, чтобы ответить");
+        if (messageId > 0) {
+            row.setOnLongClickListener(view -> {
+                setReplyTarget(messageId);
+                return true;
+            });
+        }
         row.setTextSize(14);
         row.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
         row.setPadding(AndroidUtilities.dp(10), AndroidUtilities.dp(8),
@@ -849,6 +860,18 @@ public final class WaysGramTimelineFragment extends BaseFragment {
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
             fileButton.setOnClickListener(view -> saveDocument(mediaId, mediaName, mediaType));
         }
+    }
+
+    private void setReplyTarget(long messageId) {
+        replyToMessageId = messageId;
+        statusView.setText("Ответ на сообщение #" + messageId + " · нажмите сюда, чтобы отменить");
+        statusView.setOnClickListener(view -> clearReplyTarget());
+    }
+
+    private void clearReplyTarget() {
+        replyToMessageId = 0;
+        statusView.setOnClickListener(null);
+        statusView.setText("Ответ отменён");
     }
 
     private void saveDocument(String mediaId, String mediaName, String mediaType) {
@@ -915,6 +938,9 @@ public final class WaysGramTimelineFragment extends BaseFragment {
         JSONObject payload = new JSONObject();
         try {
             payload.put("body", body);
+            if (replyToMessageId > 0) {
+                payload.put("reply_to_id", replyToMessageId);
+            }
         } catch (Exception exception) {
             statusView.setText("Не удалось подготовить сообщение");
             return;
@@ -924,7 +950,8 @@ public final class WaysGramTimelineFragment extends BaseFragment {
         apiClient.post(basePath(), payload, new WaysGramApiClient.Callback() {
             @Override
             public void onSuccess(JSONObject response) {
-                messageInput.setText("");
+                messageInput.setText("");                replyToMessageId = 0;
+                statusView.setOnClickListener(null);
                 setSendInFlight(false);
                 statusView.setText(type == TYPE_GROUP ? "Сообщение отправлено" : "Публикация создана");
                 loadMessages();

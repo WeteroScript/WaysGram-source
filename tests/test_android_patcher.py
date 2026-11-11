@@ -113,6 +113,25 @@ class WaysGramDirectoryContractTests(unittest.TestCase):
         self.assertIn('recipient != peerId', chat_source)
 
 
+class WaysGramTimelineContractTests(unittest.TestCase):
+    def test_timeline_blocks_text_and_attachment_sends_until_completion(self) -> None:
+        timeline_path = (
+            ROOT
+            / "android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/"
+            / "WaysGramTimelineFragment.java"
+        )
+        source = timeline_path.read_text(encoding="utf-8")
+        self.assertIn("private boolean sendInFlight = false", source)
+        self.assertIn("if (sendInFlight)", source)
+        self.assertIn("private void setSendInFlight(boolean inFlight)", source)
+        self.assertIn("sendButton.setEnabled(!inFlight)", source)
+        self.assertIn("attachButton.setEnabled(!inFlight)", source)
+        self.assertIn("setSendInFlight(true)", source)
+        self.assertIn("setSendInFlight(false)", source)
+        self.assertNotIn("sendButton.setEnabled(true)", source)
+        self.assertNotIn("attachButton.setEnabled(true)", source)
+
+
 class WaysGramChatContractTests(unittest.TestCase):
     def test_chat_blocks_duplicate_text_message_sends(self) -> None:
         chat_path = (

@@ -119,6 +119,29 @@ class WaysGramChatContractTests(unittest.TestCase):
         self.assertIn("sendButton.setEnabled(!inFlight)", source)
 
 
+    def test_direct_chat_marks_messages_read(self) -> None:
+        chat_path = (
+            ROOT
+            / "android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/"
+            / "WaysGramChatFragment.java"
+        )
+        source = chat_path.read_text(encoding="utf-8")
+        self.assertIn('payload.put("scope", "dm")', source)
+        self.assertIn('apiClient.put("/api/read"', source)
+        self.assertIn("markMessagesRead();", source)
+
+    def test_group_and_channel_timeline_marks_messages_read(self) -> None:
+        timeline_path = (
+            ROOT
+            / "android/overlay/TMessagesProj/src/main/java/org/telegram/messenger/waysgram/"
+            / "WaysGramTimelineFragment.java"
+        )
+        source = timeline_path.read_text(encoding="utf-8")
+        self.assertIn('payload.put("scope", type == TYPE_GROUP ? "group" : "channel")', source)
+        self.assertIn('apiClient.put("/api/read"', source)
+        self.assertIn("markMessagesRead();", source)
+
+
 class SourcePreservationTests(unittest.TestCase):
     def test_gift_sheet_source_is_unchanged(self) -> None:
         original = "import org.telegram.messenger.UserObject;\nclass GiftSheet {}\n"

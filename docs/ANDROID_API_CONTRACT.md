@@ -32,6 +32,8 @@ Content-Type: application/json
 
 The response contains `token`, `expires_at`, and `user`. The Android client stores the token with the selected API origin. It does not request or use a Telegram personal-account login code or Telegram user session.
 
+A WaysGram session is independent of a Telegram personal-account session. Session management is scoped to the authenticated WaysGram account; revoking a session invalidates its Bearer token on the next request. Revoking other sessions preserves the token used for the revoke request.
+
 ## Implemented client calls
 
 All authenticated requests use:
@@ -42,6 +44,7 @@ Authorization: Bearer <waysgram-session-token>
 
 The current Android overlay calls these API areas:
 
+- Authentication sessions: `GET /api/auth/sessions` lists the current user's active WaysGram sessions; `DELETE /api/auth/sessions/{session_id}` revokes one session; `POST /api/auth/sessions/revoke-others` revokes every other session while preserving the current one. Responses expose opaque session IDs and timestamps only, never session tokens or token hashes.
 - Profile and wallet: `GET /api/me`, `PUT /api/me`, `GET /api/me/wallet`.
 - Profile avatar: `POST /api/media/images`, `PUT /api/me/avatar`, and `DELETE /api/me/avatar`. AuthBot validates profile fields and enforces username uniqueness.
 - User lookup: `GET /api/users?q=...`.

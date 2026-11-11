@@ -1,8 +1,10 @@
 package org.telegram.messenger.waysgram;
 
+import android.app.AlertDialog;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.text.InputFilter;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -496,6 +498,15 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
             if (type == TYPE_CONTACTS || type == TYPE_BLOCKS) {
                 String username = item.optString("username", "");
                 detail = username.isEmpty() ? "" : "@" + username;
+                if (type == TYPE_CONTACTS) {
+                    String note = item.optString("note", "").trim();
+                    if (!note.isEmpty()) {
+                        if (note.length() > 120) {
+                            note = note.substring(0, 120) + "…";
+                        }
+                        detail += (detail.isEmpty() ? "" : "\\n") + "Заметка: " + note;
+                    }
+                }
             } else {
                 detail = item.optString("last_message", "");
             }
@@ -534,6 +545,17 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
             row.addView(manage, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
             ));
+            if (type == TYPE_CONTACTS && !searching) {
+                Button noteButton = new Button(getParentActivity());
+                noteButton.setAllCaps(false);
+                noteButton.setText("Заметка");
+                row.addView(noteButton, new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
+                ));
+                noteButton.setOnClickListener(view ->
+                        editContactNote(id, item.optString("note", ""))
+                );
+            }
             LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT
@@ -585,6 +607,65 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
                 ), false);
             }
         });
+    }
+
+    private void editContactNote(long userId, String currentNote) {
+        if (userId <= 0) {
+            return;
+        }
+        EditText noteInput = new EditText(getParentActivity());
+        noteInput.setSingleLine(false);
+        noteInput.setMaxLines(5);
+        noteInput.setHint("Личная заметка · до 500 символов");
+        noteInput.setFilters(new InputFilter[]{new InputFilter.LengthFilter(500)});
+        noteInput.setText(currentNote == null ? "" : currentNote);
+        noteInput.setSelection(noteInput.length());
+        LinearLayout form = new LinearLayout(getParentActivity());
+        form.setOrientation(LinearLayout.VERTICAL);
+        int padding = AndroidUtilities.dp(20);
+        form.setPadding(padding, AndroidUtilities.dp(8), padding, 0);
+        form.addView(noteInput, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+        new AlertDialog.Builder(getParentActivity())
+                .setTitle("Личная заметка к контакту")
+                .setMessage("Заметка видна только в твоём списке контактов.")
+                .setView(form)
+                .setNegativeButton("Отмена", null)
+                .setPositiveButton("Сохранить", (dialog, which) -> {
+                    String note = noteInput.getText() == null
+                            ? ""
+                            : noteInput.getText().toString();
+                    if (note.length() > 500) {
+                        statusView.setText("Заметка не должна превышать 500 символов.");
+                        return;
+                    }
+                    JSONObject payload = new JSONObject();
+                    try {
+                        payload.put("note", note);
+                    } catch (Exception exception) {
+                        statusView.setText("Не удалось подготовить заметку.");
+                        return;
+                    }
+                    statusView.setText("Сохраняю личную заметку…");
+                    apiClient.put("/api/contacts/" + userId + "/note", payload,
+                            new WaysGramApiClient.Callback() {
+                                @Override
+                                public void onSuccess(JSONObject response) {
+                                    statusView.setText(note.trim().isEmpty()
+                                            ? "Заметка удалена"
+                                            : "Личная заметка сохранена");
+                                    loadItems();
+                                }
+
+                                @Override
+                                public void onError(String message, int statusCode) {
+                                    statusView.setText(message);
+                                }
+                            });
+                })
+                .show();
     }
 
     private void addContact(long userId, Button button) {

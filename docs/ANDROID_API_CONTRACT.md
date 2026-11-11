@@ -42,7 +42,8 @@ Authorization: Bearer <waysgram-session-token>
 
 The current Android overlay calls these API areas:
 
-- Profile and wallet: `GET /api/me`, `GET /api/me/wallet`.
+- Profile and wallet: `GET /api/me`, `PUT /api/me`, `GET /api/me/wallet`.
+- Profile avatar: `POST /api/media/images`, `PUT /api/me/avatar`, and `DELETE /api/me/avatar`. AuthBot validates profile fields and enforces username uniqueness.
 - User lookup: `GET /api/users?q=...`.
 - Contacts: `GET /api/contacts`, `POST /api/contacts`, and `DELETE /api/contacts/{user_id}`. Contacts are added manually from user search; phone-book synchronization is not implemented.
 - Block list: `GET /api/blocks`, `POST /api/blocks`, and `DELETE /api/blocks/{user_id}`. A block prevents either user from sending or forwarding direct messages to the other until unblocked.
@@ -63,7 +64,7 @@ The current Android overlay calls these API areas:
 - Document upload: `POST /api/media/documents` for PDF, TXT, and CSV.
 - Authenticated attachment download: `GET /api/media/{media_id}`.
 
-Direct messages support text, conversation-scoped message search, static image, and PDF/TXT/CSV attachments. Group/channel timelines support text, static image and PDF/TXT/CSV attachments. Message history and send responses expose `media_id`, `media_type`, and `media_name` for attachments. Images render inline; documents are saved through Android's system document picker. The backend returns documents with `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff`.
+The Android profile screen supports editing display name, username and bio, viewing the current avatar, and uploading or removing the avatar. Direct messages support text, conversation-scoped message search, static image, and PDF/TXT/CSV attachments. Group/channel timelines support text, static image and PDF/TXT/CSV attachments. Message history and send responses expose `media_id`, `media_type`, and `media_name` for attachments. Images render inline; documents are saved through Android's system document picker. The backend returns documents with `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff`.
 
 Message rows expose a long-press action menu. Users can reply to a message using `reply_to_id`; history responses include the quoted text and author so Android can render a quote preview. Users can also copy message text and add or remove reactions in direct chats, groups and channels. Supported reactions are `👍`, `❤️`, `😂`, `😮`, `😢`, `🎉` and `🙏`; each user can keep up to three different reactions on a message, and selecting an existing reaction removes it. Users can also edit their own message, request deletion, or forward a message to a contact. Drafts for direct conversations, groups and channels are stored locally on the device and namespaced by the current WaysGram session; draft content is not uploaded until the user sends it. Forwarded messages preserve the original sender and source message ID; forwarding is checked against source-conversation access and is idempotent when the same key is retried. The same UI pattern is available in direct chats, groups and channels. The backend validates the reply target and enforces author, membership, owner and administrator permissions for edits/deletions. Both `PATCH` and `PUT` are supported by the edit API; the Android client uses `PUT` for compatibility with `HttpURLConnection`. Direct-message rows display their timestamp and show whether the peer's read marker covers the message; the UI refreshes when that marker advances.
 

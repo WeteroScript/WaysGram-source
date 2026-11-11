@@ -10,6 +10,15 @@ on:
       - "scripts/prepare_android_dev_build.py"
       - "android/overlay/**"
       - "android/telegram-upstream"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/android-apk.yml"
+      - "scripts/prepare-android-source.sh"
+      - "scripts/apply-android-patches.py"
+      - "scripts/prepare_android_dev_build.py"
+      - "android/overlay/**"
+      - "android/telegram-upstream"
   workflow_dispatch:
 
 permissions:
@@ -56,6 +65,8 @@ jobs:
         run: bash scripts/prepare-android-source.sh
 
       - name: Configure an isolated WaysGram development identity
+        env:
+          WAYSGRAM_API_BASE_URL: ${{ secrets.WAYSGRAM_API_BASE_URL }}
         run: python3 scripts/prepare_android_dev_build.py --android-root android/telegram-upstream
 
       - name: Build universal debug APK

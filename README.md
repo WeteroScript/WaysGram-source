@@ -14,7 +14,7 @@ cd WaysGram-source
 bash scripts/prepare-android-source.sh
 ```
 
-Скрипт проверяет закреплённую версию и копирует классы WaysGram REST overlay в Android-проект. Проверка исходников не изменяет оригинальные `LaunchActivity`, `LoginActivity`, `MainTabsActivity` или `GiftSheet`. Штатная навигация, экран входа и экран подарков Telegram остаются исходными. Launcher icon, upstream API settings, Google services и manifest declarations сохраняются. Отображаемое имя меняется на WaysGram; debug APK использует зарегистрированный package `org.telegram.messenger.beta`, чтобы сохранить штатную конфигурацию Google Services.
+Скрипт проверяет закреплённую версию и копирует классы WaysGram REST overlay в Android-проект. В `SettingsActivity` добавляется отдельный пункт **WaysGram**: при наличии WaysGram-сессии он открывает главный экран, иначе — отдельный экран входа через `AuthWaysGram_bot`. Оригинальные `LaunchActivity`, `LoginActivity`, `MainTabsActivity` и `GiftSheet` не подменяются. Штатный Telegram login, основная навигация и экран подарков остаются исходными. Launcher icon, upstream API settings, Google services и manifest declarations сохраняются. Отображаемое имя меняется на WaysGram; debug APK использует зарегистрированный package `org.telegram.messenger.beta`, чтобы сохранить штатную конфигурацию Google Services.
 
 ## AuthBot и текущий REST backend
 

@@ -34,7 +34,9 @@ public final class WaysGramChatFragment extends BaseFragment {
     private WaysGramApiClient apiClient;
     private LinearLayout messagesContainer;
     private EditText messageInput;
+    private Button sendButton;
     private TextView statusView;
+    private boolean messageSendInFlight = false;
     private final Handler pollHandler = new Handler(Looper.getMainLooper());
     private final Runnable pollRunnable = new Runnable() {
         @Override
@@ -113,7 +115,7 @@ public final class WaysGramChatFragment extends BaseFragment {
         ));
         attachButton.setOnClickListener(view -> pickAttachment());
 
-        Button sendButton = new Button(context);
+        sendButton = new Button(context);
         sendButton.setText("Отправить");
         sendButton.setAllCaps(false);
         composer.addView(sendButton, new LinearLayout.LayoutParams(
@@ -156,6 +158,7 @@ public final class WaysGramChatFragment extends BaseFragment {
                 }
                 lastMessageId = newestId;
                 statusView.setText(count == 0 ? "История пока пуста" : "Сообщений: " + count);
+                markMessagesRead();
                 scheduleNextPoll();
             }
 
@@ -167,6 +170,34 @@ public final class WaysGramChatFragment extends BaseFragment {
                     presentFragment(new WaysGramLoginFragment(), true);
                 } else {
                     scheduleNextPoll();
+                }
+            }
+        });
+    }
+
+    private void markMessagesRead() {
+        if (apiClient == null || lastMessageId <= 0) {
+            return;
+        }
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("scope", "dm");
+            payload.put("peer_id", peerId);
+            payload.put("last_read_id", lastMessageId);
+        } catch (Exception exception) {
+            return;
+        }
+        apiClient.put("/api/read", payload, new WaysGramApiClient.Callback() {
+            @Override
+            public void onSuccess(JSONObject response) {
+                // Read markers are background state; keep the chat status unchanged.
+            }
+
+            @Override
+            public void onError(String message, int statusCode) {
+                if (statusCode == 401 && getParentActivity() != null) {
+                    WaysGramSessionStore.getInstance(getParentActivity()).clearSession();
+                    presentFragment(new WaysGramLoginFragment(), true);
                 }
             }
         });
@@ -207,6 +238,7 @@ public final class WaysGramChatFragment extends BaseFragment {
                         }
                         if (count > 0) {
                             statusView.setText("Новые сообщения: " + count);
+                            markMessagesRead();
                         }
                         scheduleNextPoll();
                     }
@@ -336,7 +368,8 @@ public final class WaysGramChatFragment extends BaseFragment {
     private void addMessage(JSONObject message) {
         TextView row = new TextView(getParentActivity());
         long sender = message.optLong("sender_id", 0);
-        String prefix = sender == peerId ? peerTitle + ": " : "Вы: ";
+        long recipient = message.optLong("recipient_id", 0);
+        String prefix = sender == peerId && recipient != peerId ? peerTitle + ": " : "Вы: ";
         row.setText(prefix + message.optString("body", ""));
         row.setTextSize(14);
         row.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
@@ -429,7 +462,17 @@ public final class WaysGramChatFragment extends BaseFragment {
         });
     }
 
+    private void setMessageSendInFlight(boolean inFlight) {
+        messageSendInFlight = inFlight;
+        if (sendButton != null) {
+            sendButton.setEnabled(!inFlight);
+        }
+    }
+
     private void sendMessage() {
+        if (messageSendInFlight) {
+            return;
+        }
         String body = messageInput.getText() == null ? "" : messageInput.getText().toString().trim();
         if (body.length() == 0 || body.length() > 4000) {
             statusView.setText("Сообщение должно содержать от 1 до 4000 символов");
@@ -444,9 +487,11 @@ public final class WaysGramChatFragment extends BaseFragment {
             return;
         }
         statusView.setText("Отправляю…");
+        setMessageSendInFlight(true);
         apiClient.post("/api/messages", payload, new WaysGramApiClient.Callback() {
             @Override
             public void onSuccess(JSONObject response) {
+                setMessageSendInFlight(false);
                 messageInput.setText("");
                 statusView.setText("Сообщение отправлено");
                 loadMessages();
@@ -454,6 +499,7 @@ public final class WaysGramChatFragment extends BaseFragment {
 
             @Override
             public void onError(String message, int statusCode) {
+                setMessageSendInFlight(false);
                 statusView.setText(message);
             }
         });

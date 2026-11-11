@@ -1,10 +1,13 @@
 package org.telegram.messenger.waysgram;
 
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
@@ -33,6 +36,12 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
     private TextView statusView;
     private EditText primaryInput;
     private EditText usernameInput;
+    private EditText inviteInput;
+    private CheckBox privateChannelCheckBox;
+    private Button createDirectoryButton;
+    private Button joinInviteButton;
+    private boolean createRequestInFlight;
+    private boolean joinRequestInFlight;
 
     public WaysGramDirectoryFragment(int type) {
         this.type = type;
@@ -94,6 +103,15 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
 
     private void addDirectoryControls(Context context, LinearLayout root) {
         if (type == TYPE_CONVERSATIONS) {
+            Button savedMessages = new Button(context);
+            savedMessages.setAllCaps(false);
+            savedMessages.setText("Избранное");
+            root.addView(savedMessages, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+            ));
+            savedMessages.setOnClickListener(view -> openSavedMessages());
+
             primaryInput = new EditText(context);
             primaryInput.setSingleLine(true);
             primaryInput.setHint("Поиск по username или имени");
@@ -127,13 +145,70 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
         ));
-        Button create = new Button(context);
-        create.setText(type == TYPE_GROUPS ? "Создать группу" : "Создать канал");
-        root.addView(create, new LinearLayout.LayoutParams(
+        if (type == TYPE_CHANNELS) {
+            privateChannelCheckBox = new CheckBox(context);
+            privateChannelCheckBox.setText("Приватный канал");
+            root.addView(privateChannelCheckBox, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+            ));
+            privateChannelCheckBox.setOnCheckedChangeListener((button, checked) -> {
+                usernameInput.setVisibility(checked ? View.GONE : View.VISIBLE);
+                if (checked) {
+                    usernameInput.setText("");
+                }
+            });
+        }
+
+        createDirectoryButton = new Button(context);
+        createDirectoryButton.setText(type == TYPE_GROUPS ? "Создать группу" : "Создать канал");
+        root.addView(createDirectoryButton, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
         ));
-        create.setOnClickListener(view -> createDirectoryItem());
+        createDirectoryButton.setOnClickListener(view -> createDirectoryItem());
+
+        if (type == TYPE_CHANNELS) {
+            inviteInput = new EditText(context);
+            inviteInput.setSingleLine(true);
+            inviteInput.setHint("Ссылка или код приглашения");
+            root.addView(inviteInput, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+            ));
+            joinInviteButton = new Button(context);
+            joinInviteButton.setAllCaps(false);
+            joinInviteButton.setText("Вступить по приглашению");
+            root.addView(joinInviteButton, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+            ));
+            joinInviteButton.setOnClickListener(view -> joinChannelByInvite());
+        }
+    }
+
+    private void openSavedMessages() {
+        statusView.setText("Открываю Избранное…");
+        apiClient.get("/api/me", new WaysGramApiClient.Callback() {
+            @Override
+            public void onSuccess(JSONObject response) {
+                long userId = response.optLong("id", 0);
+                if (userId <= 0) {
+                    statusView.setText("Не удалось определить аккаунт для Избранного.");
+                    return;
+                }
+                presentFragment(new WaysGramChatFragment(userId, "Избранное"), false);
+            }
+
+            @Override
+            public void onError(String message, int statusCode) {
+                statusView.setText(message);
+                if (statusCode == 401) {
+                    WaysGramSessionStore.getInstance(getParentActivity()).clearSession();
+                    presentFragment(new WaysGramLoginFragment(), true);
+                }
+            }
+        });
     }
 
     private void searchUsers() {
@@ -170,7 +245,24 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
         }
     }
 
+    private void setCreateRequestInFlight(boolean inFlight) {
+        createRequestInFlight = inFlight;
+        if (createDirectoryButton != null) {
+            createDirectoryButton.setEnabled(!inFlight);
+        }
+    }
+
+    private void setJoinRequestInFlight(boolean inFlight) {
+        joinRequestInFlight = inFlight;
+        if (joinInviteButton != null) {
+            joinInviteButton.setEnabled(!inFlight);
+        }
+    }
+
     private void createDirectoryItem() {
+        if (createRequestInFlight) {
+            return;
+        }
         String title = primaryInput.getText() == null ? "" : primaryInput.getText().toString().trim();
         String username = usernameInput.getText() == null
                 ? ""
@@ -183,11 +275,14 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
             statusView.setText("Название должно содержать не более 80 символов.");
             return;
         }
-        if (type == TYPE_CHANNELS && username.length() == 0) {
-            statusView.setText("Для канала укажите username.");
+        boolean isPublic = type != TYPE_CHANNELS
+                || privateChannelCheckBox == null
+                || !privateChannelCheckBox.isChecked();
+        if (type == TYPE_CHANNELS && isPublic && username.length() == 0) {
+            statusView.setText("Для публичного канала укажите username.");
             return;
         }
-        if (username.length() > 0) {
+        if (username.length() > 0 && isPublic) {
             boolean validUsername = type == TYPE_GROUPS
                     ? username.matches("[a-z][a-z0-9_]{3,31}")
                     : username.matches("[a-z][a-z0-9_]{0,31}");
@@ -201,8 +296,11 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
         JSONObject payload = new JSONObject();
         try {
             payload.put("title", title);
-            if (username.length() > 0) {
+            if (username.length() > 0 && isPublic) {
                 payload.put("username", username);
+            }
+            if (type == TYPE_CHANNELS) {
+                payload.put("is_public", isPublic);
             }
         } catch (Exception exception) {
             statusView.setText("Не удалось подготовить запрос");
@@ -210,17 +308,76 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
         }
         String path = type == TYPE_GROUPS ? "/api/groups" : "/api/channels";
         statusView.setText(type == TYPE_GROUPS ? "Создаю группу…" : "Создаю канал…");
+        setCreateRequestInFlight(true);
         apiClient.post(path, payload, new WaysGramApiClient.Callback() {
             @Override
             public void onSuccess(JSONObject response) {
+                setCreateRequestInFlight(false);
                 primaryInput.setText("");
                 usernameInput.setText("");
-                statusView.setText(type == TYPE_GROUPS ? "Группа создана" : "Канал создан");
+                if (privateChannelCheckBox != null) {
+                    privateChannelCheckBox.setChecked(false);
+                }
+                if (type == TYPE_CHANNELS && !isPublic) {
+                    String inviteLink = response.optString("invite_link", "");
+                    if (inviteLink.length() > 0) {
+                        ClipboardManager clipboard = (ClipboardManager) getParentActivity()
+                                .getSystemService(Context.CLIPBOARD_SERVICE);
+                        if (clipboard != null) {
+                            clipboard.setPrimaryClip(ClipData.newPlainText("WaysGram invite", inviteLink));
+                        }
+                        statusView.setText("Приватный канал создан. Полная ссылка-приглашение скопирована:\n"
+                                + inviteLink);
+                    } else {
+                        statusView.setText("Приватный канал создан, но сервер не вернул ссылку-приглашение.");
+                    }
+                } else {
+                    statusView.setText(type == TYPE_GROUPS ? "Группа создана" : "Публичный канал создан");
+                }
                 loadItems();
             }
 
             @Override
             public void onError(String message, int statusCode) {
+                setCreateRequestInFlight(false);
+                statusView.setText(message);
+            }
+        });
+    }
+
+    private void joinChannelByInvite() {
+        if (joinRequestInFlight) {
+            return;
+        }
+        String inviteValue = inviteInput == null || inviteInput.getText() == null
+                ? ""
+                : inviteInput.getText().toString().trim();
+        if (inviteValue.length() == 0) {
+            statusView.setText("Вставьте ссылку или код приглашения.");
+            return;
+        }
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("invite_link", inviteValue);
+        } catch (Exception exception) {
+            statusView.setText("Не удалось подготовить приглашение.");
+            return;
+        }
+        statusView.setText("Проверяю приглашение…");
+        setJoinRequestInFlight(true);
+        apiClient.post("/api/channels/join", payload, new WaysGramApiClient.Callback() {
+            @Override
+            public void onSuccess(JSONObject response) {
+                setJoinRequestInFlight(false);
+                inviteInput.setText("");
+                statusView.setText("Вы вступили в приватный канал: "
+                        + response.optString("title", "Канал"));
+                loadItems();
+            }
+
+            @Override
+            public void onError(String message, int statusCode) {
+                setJoinRequestInFlight(false);
                 statusView.setText(message);
             }
         });
@@ -277,6 +434,27 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
         });
     }
 
+    private static boolean isPublicChannel(JSONObject item) {
+        Object value = item.opt("is_public");
+        if (value instanceof Boolean) {
+            return (Boolean) value;
+        }
+        if (value instanceof Number) {
+            return ((Number) value).intValue() != 0;
+        }
+        if (value instanceof String) {
+            String flag = ((String) value).trim();
+            if ("0".equals(flag) || "false".equalsIgnoreCase(flag)) {
+                return false;
+            }
+            if ("1".equals(flag) || "true".equalsIgnoreCase(flag)) {
+                return true;
+            }
+        }
+        // Older API versions had no is_public field and exposed only public channels.
+        return value == null;
+    }
+
     private void addItem(JSONObject item) {
         String title;
         String detail = "";
@@ -292,8 +470,12 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
             detail = item.optString("member_count", "0") + " участников";
         } else {
             title = item.optString("title", "Канал " + id);
-            String username = item.optString("username", "");
-            detail = username.length() > 0 ? "@" + username : "";
+            if (isPublicChannel(item)) {
+                String username = item.optString("username", "");
+                detail = username.length() > 0 ? "@" + username : "Публичный канал";
+            } else {
+                detail = "Приватный канал";
+            }
         }
 
         Button button = new Button(getParentActivity());

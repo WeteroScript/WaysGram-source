@@ -49,5 +49,5 @@ echo "Pinned commit: $ACTUAL_COMMIT"
 python3 "$ROOT/scripts/apply-android-patches.py" --android-root "$ANDROID_ROOT"
 
 echo "Original Telegram startup, login screens, navigation, and GiftSheet remain unchanged."
-echo "WaysGram REST overlay classes are present but are not selected as the startup UI."
+echo "A dedicated WaysGram entry point is available from Settings; its login uses the separate WaysGram API session."
 echo "No APK was built."

@@ -46,8 +46,8 @@ The current Android overlay calls these API areas:
 - User lookup: `GET /api/users?q=...`.
 - Personal messages: `GET /api/messages` and `POST /api/messages`.
 - Search within a personal conversation: `GET /api/messages/search?with={peer_id}&q={text}` (up to 100 matches, scoped to the authenticated conversation).
-- Groups: `GET /api/groups`, `POST /api/groups`, group history and text-post routes.
-- Channels: `GET /api/channels`, `POST /api/channels`, channel history and text-post routes.
+- Groups: `GET /api/groups`, `POST /api/groups`, group history, text-post and message-search routes.
+- Channels: `GET /api/channels`, `POST /api/channels`, channel history, text-post and message-search routes.
 - Telegram gift catalogue and WaysGram storefront: `GET /api/telegram/gifts?all=1`.
 - Storefront purchase: `POST /api/telegram/gifts/{gift_id}/purchase` with optional `Idempotency-Key`.
 - Owned gift inventory: `GET /api/me/gifts`.

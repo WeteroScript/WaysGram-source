@@ -193,6 +193,15 @@ public final class WaysGramTimelineFragment extends BaseFragment {
         ));
         searchButton.setOnClickListener(view -> showMessageSearchDialog());
 
+        Button pinnedButton = new Button(context);
+        pinnedButton.setText("Закреплённые сообщения");
+        pinnedButton.setAllCaps(false);
+        root.addView(pinnedButton, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+        pinnedButton.setOnClickListener(view -> showPinnedMessages());
+
         fragmentView = root;
         loadManagement();
         initializeMessageEventCursor();
@@ -1134,7 +1143,10 @@ public final class WaysGramTimelineFragment extends BaseFragment {
         if (messageId <= 0) {
             return;
         }
-        String[] actions = {"Ответить", "Реакция", "Копировать", "Редактировать", "Удалить"};
+        String[] actions = {
+                "Ответить", "Реакция", "Копировать", "Редактировать",
+                "Удалить", "Закрепить", "Снять закрепление"
+        };
         new AlertDialog.Builder(getParentActivity())
                 .setItems(actions, (dialog, which) -> {
                     if (which == 0) {
@@ -1147,9 +1159,104 @@ public final class WaysGramTimelineFragment extends BaseFragment {
                         editMessage(messageId, message.optString("body", ""));
                     } else if (which == 4) {
                         confirmDeleteMessage(messageId);
+                    } else if (which == 5) {
+                        changePinnedMessage(messageId, true);
+                    } else if (which == 6) {
+                        changePinnedMessage(messageId, false);
                     }
                 })
                 .show();
+    }
+
+    private String pinScope() {
+        return type == TYPE_GROUP ? "group" : "channel";
+    }
+
+    private void showPinnedMessages() {
+        String scope = pinScope();
+        statusView.setText("Загружаю закреплённые сообщения…");
+        apiClient.get("/api/pins?scope=" + scope + "&peer_id=" + targetId,
+                new WaysGramApiClient.Callback() {
+                    @Override
+                    public void onSuccess(JSONObject response) {
+                        JSONArray pinned = response.optJSONArray("pinned_messages");
+                        int count = pinned == null ? 0 : pinned.length();
+                        if (count == 0) {
+                            statusView.setText("Закреплённых сообщений нет");
+                            new AlertDialog.Builder(getParentActivity())
+                                    .setTitle("Закреплённые сообщения")
+                                    .setMessage("В этом чате пока нет закреплённых сообщений.")
+                                    .setPositiveButton("Закрыть", null)
+                                    .show();
+                            return;
+                        }
+                        StringBuilder text = new StringBuilder();
+                        int visible = Math.min(count, 100);
+                        for (int i = 0; i < visible; i++) {
+                            JSONObject item = pinned.optJSONObject(i);
+                            if (item == null) {
+                                continue;
+                            }
+                            if (text.length() > 0) {
+                                text.append("\n\n");
+                            }
+                            text.append("#").append(item.optLong("message_id", 0))
+                                    .append(" · @").append(item.optLong("sender_id", 0));
+                            String body = item.optString("body", "");
+                            if (body.length() > 280) {
+                                body = body.substring(0, 280) + "…";
+                            }
+                            text.append("\n").append(body);
+                        }
+                        statusView.setText("Закреплённых сообщений: " + count);
+                        new AlertDialog.Builder(getParentActivity())
+                                .setTitle("Закреплённые сообщения · " + count)
+                                .setMessage(text.toString())
+                                .setPositiveButton("Закрыть", null)
+                                .show();
+                    }
+
+                    @Override
+                    public void onError(String message, int statusCode) {
+                        statusView.setText(message);
+                    }
+                });
+    }
+
+    private void changePinnedMessage(long messageId, boolean pin) {
+        if (messageId <= 0) {
+            return;
+        }
+        String scope = pinScope();
+        WaysGramApiClient.Callback callback = new WaysGramApiClient.Callback() {
+            @Override
+            public void onSuccess(JSONObject response) {
+                statusView.setText(pin ? "Сообщение закреплено" : "Закрепление снято");
+                loadMessages();
+            }
+
+            @Override
+            public void onError(String message, int statusCode) {
+                statusView.setText(message);
+            }
+        };
+        if (pin) {
+            JSONObject payload = new JSONObject();
+            try {
+                payload.put("scope", scope);
+                payload.put("peer_id", targetId);
+                payload.put("message_id", messageId);
+            } catch (Exception exception) {
+                statusView.setText("Не удалось подготовить закрепление");
+                return;
+            }
+            apiClient.post("/api/pins", payload, callback);
+        } else {
+            apiClient.delete(
+                    "/api/pins?scope=" + scope + "&peer_id=" + targetId + "&message_id=" + messageId,
+                    callback
+            );
+        }
     }
 
     private void editMessage(long messageId, String currentBody) {

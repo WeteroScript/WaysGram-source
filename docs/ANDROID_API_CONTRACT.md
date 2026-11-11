@@ -89,6 +89,7 @@ The group timeline loads `GET /api/groups/{group_id}`, including the signed-in u
 - `DELETE /api/groups/{group_id}/members/{telegram_id}` to remove a member or leave (subject to server role rules).
 - `POST /api/groups/{group_id}/admins` with `telegram_id` to promote a member (owner only).
 - `DELETE /api/groups/{group_id}/admins/{telegram_id}` to return an admin to member (owner only).
+- `PUT /api/groups/{group_id}/slow-mode` with `{seconds}` configures the group delay: 0, 5, 10, 15, 30, 60, 120 or 300 seconds. Only owners/admins can change it. Ordinary members receive HTTP 429 with `Retry-After` while their group-specific interval is active; owners and admins are exempt.
 - `POST /api/groups/{group_id}/invites` creates an invite link (owner/admin; `expires_in_hours` 1–8760, optional `max_uses` 1–10000, optional `require_approval`); the database stores only a hash of the token.
 - `GET /api/groups/invites/{token}` previews a valid invite; `POST /api/groups/join` accepts a link or token. If approval is required, it creates a pending request instead of adding the user immediately.
 - `GET /api/groups/{group_id}/join-requests`, `POST /api/groups/{group_id}/join-requests/{telegram_id}/approve`, and `POST /api/groups/{group_id}/join-requests/{telegram_id}/decline` are restricted to group owners/admins.

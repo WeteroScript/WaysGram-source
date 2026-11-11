@@ -181,7 +181,7 @@ class WaysGramBuildConfigurationTests(unittest.TestCase):
             )
             login_sheet.parent.mkdir(parents=True)
             login_sheet.write_text(
-                'private static final String DEFAULT_API_BASE_URL = "https://old.example";\\n',
+                '    private static final String DEFAULT_API_BASE_URL = "https://old.example";\\n',
                 encoding="utf-8",
             )
             with patch.dict(

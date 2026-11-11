@@ -30,6 +30,7 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
     public static final int TYPE_GROUPS = 2;
     public static final int TYPE_CHANNELS = 3;
     public static final int TYPE_CONTACTS = 4;
+    public static final int TYPE_BLOCKS = 5;
 
     private final int type;
     private WaysGramApiClient apiClient;
@@ -44,6 +45,7 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
     private boolean createRequestInFlight;
     private boolean joinRequestInFlight;
     private boolean showingContactSearchResults;
+    private boolean showingBlockSearchResults;
 
     public WaysGramDirectoryFragment(int type) {
         this.type = type;
@@ -51,7 +53,7 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
 
     @Override
     public boolean onFragmentCreate() {
-        return type >= TYPE_CONVERSATIONS && type <= TYPE_CONTACTS;
+        return type >= TYPE_CONVERSATIONS && type <= TYPE_BLOCKS;
     }
 
     @Override
@@ -104,7 +106,7 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
     }
 
     private void addDirectoryControls(Context context, LinearLayout root) {
-        if (type == TYPE_CONVERSATIONS || type == TYPE_CONTACTS) {
+        if (type == TYPE_CONVERSATIONS || type == TYPE_CONTACTS || type == TYPE_BLOCKS) {
             if (type == TYPE_CONVERSATIONS) {
                 Button savedMessages = new Button(context);
                 savedMessages.setAllCaps(false);
@@ -120,13 +122,17 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
             primaryInput.setSingleLine(true);
             primaryInput.setHint(type == TYPE_CONTACTS
                     ? "Найти контакт по username или имени"
-                    : "Поиск по username или имени");
+                    : type == TYPE_BLOCKS
+                        ? "Найти пользователя по username или имени"
+                        : "Поиск по username или имени");
             root.addView(primaryInput, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT
             ));
             Button search = new Button(context);
-            search.setText(type == TYPE_CONTACTS ? "Найти и добавить контакт" : "Найти пользователя");
+            search.setText(type == TYPE_CONTACTS
+                    ? "Найти и добавить контакт"
+                    : type == TYPE_BLOCKS ? "Найти и заблокировать" : "Найти пользователя");
             root.addView(search, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT
@@ -221,6 +227,8 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
         String query = primaryInput.getText() == null ? "" : primaryInput.getText().toString().trim();
         if (type == TYPE_CONTACTS) {
             showingContactSearchResults = true;
+        } else if (type == TYPE_BLOCKS) {
+            showingBlockSearchResults = true;
         }
         if (query.length() == 0) {
             statusView.setText("Введите username или имя для поиска");
@@ -400,6 +408,8 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
                 return "Каналы";
             case TYPE_CONTACTS:
                 return "Контакты";
+            case TYPE_BLOCKS:
+                return "Чёрный список";
             default:
                 return "Сообщения";
         }
@@ -418,6 +428,10 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
             path = "/api/contacts";
             key = "contacts";
             showingContactSearchResults = false;
+        } else if (type == TYPE_BLOCKS) {
+            path = "/api/blocks";
+            key = "blocked_users";
+            showingBlockSearchResults = false;
         } else {
             path = "/api/conversations";
             key = "conversations";
@@ -474,12 +488,12 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
         String title;
         String detail = "";
         long id = item.optLong("id", 0);
-        if (type == TYPE_CONVERSATIONS || type == TYPE_CONTACTS) {
+        if (type == TYPE_CONVERSATIONS || type == TYPE_CONTACTS || type == TYPE_BLOCKS) {
             title = item.optString("display_name", "");
             if (title.length() == 0) {
                 title = item.optString("username", "Пользователь " + id);
             }
-            if (type == TYPE_CONTACTS) {
+            if (type == TYPE_CONTACTS || type == TYPE_BLOCKS) {
                 String username = item.optString("username", "");
                 detail = username.isEmpty() ? "" : "@" + username;
             } else {
@@ -498,7 +512,7 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
             }
         }
 
-        if (type == TYPE_CONTACTS) {
+        if (type == TYPE_CONTACTS || type == TYPE_BLOCKS) {
             LinearLayout row = new LinearLayout(getParentActivity());
             row.setOrientation(LinearLayout.HORIZONTAL);
             row.setGravity(Gravity.CENTER_VERTICAL);
@@ -511,7 +525,12 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
             ));
             Button manage = new Button(getParentActivity());
             manage.setAllCaps(false);
-            manage.setText(showingContactSearchResults ? "Добавить" : "Удалить");
+            boolean searching = type == TYPE_CONTACTS
+                    ? showingContactSearchResults
+                    : showingBlockSearchResults;
+            manage.setText(type == TYPE_CONTACTS
+                    ? (searching ? "Добавить" : "Удалить")
+                    : (searching ? "Заблокировать" : "Разблокировать"));
             row.addView(manage, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
             ));
@@ -527,10 +546,16 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
                     presentFragment(new WaysGramChatFragment(id, selectedTitle), false);
                 }
             });
-            if (showingContactSearchResults) {
-                manage.setOnClickListener(view -> addContact(id, manage));
+            if (type == TYPE_CONTACTS) {
+                if (showingContactSearchResults) {
+                    manage.setOnClickListener(view -> addContact(id, manage));
+                } else {
+                    manage.setOnClickListener(view -> removeContact(id));
+                }
+            } else if (showingBlockSearchResults) {
+                manage.setOnClickListener(view -> blockUser(id, manage));
             } else {
-                manage.setOnClickListener(view -> removeContact(id));
+                manage.setOnClickListener(view -> unblockUser(id));
             }
             return;
         }
@@ -586,6 +611,53 @@ public final class WaysGramDirectoryFragment extends BaseFragment {
             public void onError(String message, int statusCode) {
                 button.setEnabled(true);
                 button.setText("Добавить");
+                statusView.setText(message);
+            }
+        });
+    }
+
+    private void blockUser(long userId, Button button) {
+        if (userId <= 0 || button == null || !button.isEnabled()) {
+            return;
+        }
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("user_id", userId);
+        } catch (Exception exception) {
+            statusView.setText("Не удалось подготовить блокировку");
+            return;
+        }
+        button.setEnabled(false);
+        button.setText("Блокирую…");
+        apiClient.post("/api/blocks", payload, new WaysGramApiClient.Callback() {
+            @Override
+            public void onSuccess(JSONObject response) {
+                button.setText("Заблокирован");
+                statusView.setText("Пользователь добавлен в чёрный список");
+            }
+
+            @Override
+            public void onError(String message, int statusCode) {
+                button.setEnabled(true);
+                button.setText("Заблокировать");
+                statusView.setText(message);
+            }
+        });
+    }
+
+    private void unblockUser(long userId) {
+        if (userId <= 0) {
+            return;
+        }
+        apiClient.delete("/api/blocks/" + userId, new WaysGramApiClient.Callback() {
+            @Override
+            public void onSuccess(JSONObject response) {
+                statusView.setText("Пользователь разблокирован");
+                loadItems();
+            }
+
+            @Override
+            public void onError(String message, int statusCode) {
                 statusView.setText(message);
             }
         });

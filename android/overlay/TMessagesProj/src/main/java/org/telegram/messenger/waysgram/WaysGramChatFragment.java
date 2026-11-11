@@ -8,6 +8,8 @@ import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -112,6 +114,22 @@ public final class WaysGramChatFragment extends BaseFragment {
         messageInput.setHint("Сообщение или подпись к фото");
         messageInput.setSingleLine(false);
         messageInput.setMaxLines(4);
+        messageInput.setText(WaysGramDraftStore.load(context, "dm", peerId));
+        messageInput.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence value, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence value, int start, int before, int count) {
+            }
+
+            @Override
+            public void afterTextChanged(Editable value) {
+                WaysGramDraftStore.save(getParentActivity(), "dm", peerId,
+                        value == null ? "" : value.toString());
+            }
+        });
         composer.addView(messageInput, new LinearLayout.LayoutParams(
                 0,
                 ViewGroup.LayoutParams.WRAP_CONTENT,

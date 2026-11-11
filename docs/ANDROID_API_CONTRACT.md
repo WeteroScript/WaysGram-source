@@ -71,6 +71,7 @@ The current Android overlay calls these API areas:
 - Gift stickers: `GET /api/telegram/gifts/{gift_id}/sticker`.
 - Image upload: `POST /api/media/images`.
 - Document upload: `POST /api/media/documents` for PDF, TXT, and CSV.
+- Shared media history: `GET /api/media/shared?scope={dm|group|channel}&peer_id={id}` returns attachments in the authorized conversation. Optional `kind=image|video|audio|document`, `before_id`, and `limit` (1–100) support filtering and cursor pagination. Each result includes the message ID, sender, media ID, MIME type, display name, timestamp, and authenticated download path. Access to groups and private channels is enforced.
 - Authenticated attachment download: `GET /api/media/{media_id}`.
 
 The Android profile screen supports editing display name, username and bio, viewing the current avatar, and uploading or removing the avatar. Direct messages support text, conversation-scoped message search, static image, and PDF/TXT/CSV attachments. Group/channel timelines support text, static image and PDF/TXT/CSV attachments. Message history and send responses expose `media_id`, `media_type`, and `media_name` for attachments. Images render inline; documents are saved through Android's system document picker. The backend returns documents with `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff`.

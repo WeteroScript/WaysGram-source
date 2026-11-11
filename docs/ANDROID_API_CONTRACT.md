@@ -44,6 +44,7 @@ The current Android overlay calls these API areas:
 
 - Profile and wallet: `GET /api/me`, `GET /api/me/wallet`.
 - User lookup: `GET /api/users?q=...`.
+- Contacts: `GET /api/contacts`, `POST /api/contacts`, and `DELETE /api/contacts/{user_id}`. Contacts are added manually from user search; phone-book synchronization is not implemented.
 - Personal messages: `GET /api/messages` and `POST /api/messages`.
 - Search within a personal conversation: `GET /api/messages/search?with={peer_id}&q={text}` (up to 100 matches, scoped to the authenticated conversation).
 - Groups: `GET /api/groups`, `POST /api/groups`, group history, text-post and message-search routes.

@@ -2,6 +2,7 @@ package org.telegram.messenger.waysgram;
 
 import android.graphics.Bitmap;
 import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -228,17 +229,48 @@ public final class WaysGramUserProfileFragment extends BaseFragment {
             if (gift == null) {
                 continue;
             }
-            String title = gift.optString("gift_name", "Подарок");
+            JSONObject attributes = gift.optJSONObject("attributes");
+            if (attributes == null) {
+                attributes = new JSONObject();
+            }
+            String title = gift.optString("gift_name", "Подарок WaysGram");
             String serial = gift.optString("serial_number", "");
             String telegramId = gift.optString("telegram_gift_id", "");
-            StringBuilder text = new StringBuilder(title);
-            if (!telegramId.isEmpty()) {
-                text.append("\nTelegram Gift ID: ").append(telegramId);
-            }
+            int level = Math.max(
+                    gift.optInt("upgrade_level", 0),
+                    attributes.optInt("upgrade_level", 0)
+            );
+
+            LinearLayout card = new LinearLayout(getParentActivity());
+            card.setOrientation(LinearLayout.VERTICAL);
+            card.setPadding(AndroidUtilities.dp(12), AndroidUtilities.dp(10),
+                    AndroidUtilities.dp(12), AndroidUtilities.dp(10));
+            GradientDrawable background = new GradientDrawable();
+            background.setColor(Theme.getColor(Theme.key_windowBackgroundWhite));
+            background.setCornerRadius(AndroidUtilities.dp(12));
+            card.setBackground(background);
+
+            TextView titleView = addLabel(getParentActivity(), card, "🎁  " + title, 16, true);
+            titleView.setPadding(AndroidUtilities.dp(2), AndroidUtilities.dp(3),
+                    AndroidUtilities.dp(2), AndroidUtilities.dp(5));
+            addLabel(getParentActivity(), card, "Уровень WaysGram: " + level, 13, true);
             if (!serial.isEmpty()) {
-                text.append("\nСерийный номер: ").append(serial);
+                addLabel(getParentActivity(), card, "Серийный номер: " + serial, 12, false);
             }
-            addLabel(getParentActivity(), giftsContainer, text.toString(), 13, false);
+            if (!telegramId.isEmpty()) {
+                addLabel(getParentActivity(), card, "Источник каталога · Telegram Gift ID: " + telegramId, 12, false);
+            }
+            if ("waysgram_internal".equals(attributes.optString("upgrade_source", ""))) {
+                addLabel(getParentActivity(), card,
+                        "Улучшение и характеристики принадлежат коллекционной системе WaysGram",
+                        12, false);
+            }
+            if (gift.optInt("is_listed", 0) == 1) {
+                addLabel(getParentActivity(), card, "Выставлен на маркетплейсе", 12, false);
+            }
+            LinearLayout.LayoutParams cardParams = matchWrap();
+            cardParams.bottomMargin = AndroidUtilities.dp(8);
+            giftsContainer.addView(card, cardParams);
         }
     }
 

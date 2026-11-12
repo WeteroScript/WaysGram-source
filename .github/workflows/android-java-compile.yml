@@ -58,6 +58,7 @@ jobs:
         working-directory: android/telegram-upstream
         run: |
           ./gradlew :TMessagesProj_App:compileAfatDebugJavaWithJavac \
+            -x :TMessagesProj_App:processAfatDebugGoogleServices \
             --no-daemon \
             --stacktrace \
             --max-workers=2 \

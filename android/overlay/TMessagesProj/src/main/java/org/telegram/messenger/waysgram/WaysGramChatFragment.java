@@ -31,6 +31,7 @@ import org.telegram.ui.ActionBar.Theme;
 import java.text.DateFormat;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -866,6 +867,30 @@ public final class WaysGramChatFragment extends BaseFragment {
             if (giftAttributes != null
                     && "waysgram_internal".equals(giftAttributes.optString("upgrade_source", ""))) {
                 giftInfo.append("\nУлучшение выполнено внутри WaysGram");
+                long upgradedAt = giftAttributes.optLong("last_upgraded_at", 0);
+                if (upgradedAt > 0) {
+                    String upgradedAtText = DateFormat.getDateTimeInstance(
+                            DateFormat.SHORT, DateFormat.SHORT
+                    ).format(new Date(upgradedAt * 1000L));
+                    giftInfo.append("\nДата улучшения: ").append(upgradedAtText);
+                }
+                Iterator<String> attributeKeys = giftAttributes.keys();
+                while (attributeKeys.hasNext()) {
+                    String key = attributeKeys.next();
+                    if ("upgrade_level".equals(key) || "last_upgraded_at".equals(key)
+                            || "upgrade_source".equals(key)) {
+                        continue;
+                    }
+                    Object value = giftAttributes.opt(key);
+                    if (value == null || value == JSONObject.NULL) {
+                        continue;
+                    }
+                    String valueText = value.toString();
+                    if (valueText.length() > 100) {
+                        valueText = valueText.substring(0, 100) + "…";
+                    }
+                    giftInfo.append("\n").append(key).append(": ").append(valueText);
+                }
             }
             giftDetails.setText(giftInfo.toString());
             giftDetails.setTextSize(12);

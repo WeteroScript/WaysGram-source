@@ -262,7 +262,32 @@ public final class WaysGramUserProfileFragment extends BaseFragment {
             }
             if ("waysgram_internal".equals(attributes.optString("upgrade_source", ""))) {
                 addLabel(getParentActivity(), card,
-                        "Улучшение и характеристики принадлежат коллекционной системе WaysGram",
+                        "Улучшение выполнено внутри коллекционной системы WaysGram",
+                        12, false);
+            }
+            long upgradedAt = attributes.optLong("last_upgraded_at", 0);
+            if (upgradedAt > 0) {
+                String upgradedAtText = DateFormat.getDateTimeInstance(
+                        DateFormat.SHORT, DateFormat.SHORT
+                ).format(new Date(upgradedAt * 1000L));
+                addLabel(getParentActivity(), card, "Дата улучшения: " + upgradedAtText, 12, false);
+            }
+            Iterator<String> attributeKeys = attributes.keys();
+            while (attributeKeys.hasNext()) {
+                String key = attributeKeys.next();
+                if ("upgrade_level".equals(key) || "last_upgraded_at".equals(key)
+                        || "upgrade_source".equals(key)) {
+                    continue;
+                }
+                Object value = attributes.opt(key);
+                if (value == null || value == JSONObject.NULL) {
+                    continue;
+                }
+                String valueText = value.toString();
+                if (valueText.length() > 100) {
+                    valueText = valueText.substring(0, 100) + "…";
+                }
+                addLabel(getParentActivity(), card, "Характеристика · " + key + ": " + valueText,
                         12, false);
             }
             if (gift.optInt("is_listed", 0) == 1) {

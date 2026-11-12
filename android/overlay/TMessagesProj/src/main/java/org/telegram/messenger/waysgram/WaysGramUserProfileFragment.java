@@ -18,6 +18,10 @@ import org.telegram.messenger.AndroidUtilities;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
 
+import java.text.DateFormat;
+import java.util.Date;
+import java.util.Iterator;
+
 /** Public WaysGram profile with gifts and shared relationships. */
 public final class WaysGramUserProfileFragment extends BaseFragment {
     private final long userId;

@@ -7,6 +7,7 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
@@ -155,6 +156,15 @@ public final class WaysGramChatFragment extends BaseFragment {
                 ViewGroup.LayoutParams.WRAP_CONTENT
         ));
         attachButton.setOnClickListener(view -> pickAttachment());
+
+        Button giftButton = new Button(context);
+        giftButton.setText("Подарок");
+        giftButton.setAllCaps(false);
+        composer.addView(giftButton, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+        giftButton.setOnClickListener(view -> showGiftPicker());
 
         sendButton = new Button(context);
         sendButton.setText("Отправить");
@@ -627,6 +637,125 @@ public final class WaysGramChatFragment extends BaseFragment {
         });
     }
 
+    private void showGiftPicker() {
+        if (messageSendInFlight || apiClient == null) {
+            return;
+        }
+        statusView.setText("Загружаю ваши подарки…");
+        apiClient.get("/api/me/gifts", new WaysGramApiClient.Callback() {
+            @Override
+            public void onSuccess(JSONObject response) {
+                JSONArray gifts = response.optJSONArray("gifts");
+                java.util.ArrayList<JSONObject> available = new java.util.ArrayList<>();
+                if (gifts != null) {
+                    for (int i = 0; i < gifts.length(); i++) {
+                        JSONObject gift = gifts.optJSONObject(i);
+                        if (gift != null && gift.optInt("is_listed", 0) != 1) {
+                            available.add(gift);
+                        }
+                    }
+                }
+                if (available.isEmpty()) {
+                    statusView.setText(gifts == null || gifts.length() == 0
+                            ? "У вас пока нет подарков для отправки"
+                            : "Снимите подарок с маркетплейса перед отправкой");
+                    return;
+                }
+                String[] labels = new String[available.size()];
+                for (int i = 0; i < available.size(); i++) {
+                    JSONObject gift = available.get(i);
+                    labels[i] = gift.optString("gift_name", "Подарок WaysGram")
+                            + " · уровень " + gift.optInt("upgrade_level", 0)
+                            + "\n" + gift.optString("serial_number", "");
+                }
+                statusView.setText("Выберите подарок для отправки");
+                new AlertDialog.Builder(getParentActivity())
+                        .setTitle("Ваши подарки")
+                        .setItems(labels, (dialog, which) -> {
+                            if (which >= 0 && which < available.size()) {
+                                confirmSendGift(available.get(which));
+                            }
+                        })
+                        .setNegativeButton("Закрыть", null)
+                        .show();
+            }
+
+            @Override
+            public void onError(String message, int statusCode) {
+                statusView.setText(message);
+                if (statusCode == 401) {
+                    WaysGramSessionStore.getInstance(getParentActivity()).clearSession();
+                    presentFragment(new WaysGramLoginFragment(), true);
+                }
+            }
+        });
+    }
+
+    private void confirmSendGift(JSONObject gift) {
+        if (gift == null) {
+            return;
+        }
+        String giftName = gift.optString("gift_name", "Подарок WaysGram");
+        String serial = gift.optString("serial_number", "");
+        String caption = messageInput.getText() == null
+                ? ""
+                : messageInput.getText().toString().trim();
+        String message = "Передать «" + giftName + "» пользователю "
+                + (peerTitle.isEmpty() ? peerId : peerTitle)
+                + "?\nСерийный номер: " + serial;
+        if (!caption.isEmpty()) {
+            message += "\n\nПодпись: " + caption;
+        }
+        new AlertDialog.Builder(getParentActivity())
+                .setTitle("Отправка подарка")
+                .setMessage(message)
+                .setNegativeButton("Отмена", null)
+                .setPositiveButton("Отправить", (dialog, which) -> sendGiftMessage(gift, caption))
+                .show();
+    }
+
+    private void sendGiftMessage(JSONObject gift, String caption) {
+        String serial = gift.optString("serial_number", "");
+        if (serial.isEmpty() || messageSendInFlight) {
+            return;
+        }
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("recipient_id", peerId);
+            payload.put("serial_number", serial);
+            if (caption != null && !caption.isEmpty()) {
+                payload.put("body", caption);
+            }
+        } catch (Exception exception) {
+            statusView.setText("Не удалось подготовить подарок к отправке");
+            return;
+        }
+        setMessageSendInFlight(true);
+        statusView.setText("Передаю подарок…");
+        String idempotencyKey = "wg-chat-gift-" + UUID.randomUUID().toString().replace("-", "");
+        apiClient.post("/api/messages/gift", payload, idempotencyKey, new WaysGramApiClient.Callback() {
+            @Override
+            public void onSuccess(JSONObject response) {
+                setMessageSendInFlight(false);
+                clearChatDraft();
+                replyToMessageId = 0;
+                statusView.setOnClickListener(null);
+                statusView.setText("Подарок отправлен");
+                loadMessages();
+            }
+
+            @Override
+            public void onError(String message, int statusCode) {
+                setMessageSendInFlight(false);
+                statusView.setText(message);
+                if (statusCode == 401) {
+                    WaysGramSessionStore.getInstance(getParentActivity()).clearSession();
+                    presentFragment(new WaysGramLoginFragment(), true);
+                }
+            }
+        });
+    }
+
     private void addMessage(JSONObject message) {
         TextView row = new TextView(getParentActivity());
         long sender = message.optLong("sender_id", 0);
@@ -699,6 +828,58 @@ public final class WaysGramChatFragment extends BaseFragment {
         );
         params.bottomMargin = AndroidUtilities.dp(4);
         messagesContainer.addView(row, params);
+
+        String giftSerial = message.optString("gift_serial_number", "");
+        if (!giftSerial.isEmpty()) {
+            JSONObject giftAttributes = message.optJSONObject("gift_attributes");
+            int giftLevel = Math.max(
+                    message.optInt("gift_upgrade_level", 0),
+                    giftAttributes == null ? 0 : giftAttributes.optInt("upgrade_level", 0)
+            );
+            String giftName = message.optString("gift_name", "Подарок WaysGram");
+            LinearLayout giftCard = new LinearLayout(getParentActivity());
+            giftCard.setOrientation(LinearLayout.VERTICAL);
+            giftCard.setPadding(AndroidUtilities.dp(14), AndroidUtilities.dp(10),
+                    AndroidUtilities.dp(14), AndroidUtilities.dp(10));
+            GradientDrawable giftBackground = new GradientDrawable();
+            giftBackground.setColor(Theme.getColor(Theme.key_windowBackgroundWhite));
+            giftBackground.setCornerRadius(AndroidUtilities.dp(14));
+            giftCard.setBackground(giftBackground);
+
+            TextView giftTitle = new TextView(getParentActivity());
+            giftTitle.setText("🎁  " + giftName);
+            giftTitle.setTextSize(16);
+            giftTitle.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+            giftTitle.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
+            giftCard.addView(giftTitle, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ));
+
+            TextView giftDetails = new TextView(getParentActivity());
+            StringBuilder giftInfo = new StringBuilder("Коллекция WaysGram · уровень ")
+                    .append(giftLevel)
+                    .append("\nСерийный номер: ").append(giftSerial);
+            String giftTelegramId = message.optString("gift_telegram_gift_id", "");
+            if (!giftTelegramId.isEmpty()) {
+                giftInfo.append("\nTelegram Gift ID: ").append(giftTelegramId);
+            }
+            if (giftAttributes != null
+                    && "waysgram_internal".equals(giftAttributes.optString("upgrade_source", ""))) {
+                giftInfo.append("\nУлучшение выполнено внутри WaysGram");
+            }
+            giftDetails.setText(giftInfo.toString());
+            giftDetails.setTextSize(12);
+            giftDetails.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
+            giftDetails.setPadding(0, AndroidUtilities.dp(5), 0, 0);
+            giftCard.addView(giftDetails, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ));
+            LinearLayout.LayoutParams giftParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            );
+            giftParams.bottomMargin = AndroidUtilities.dp(8);
+            messagesContainer.addView(giftCard, giftParams);
+        }
 
         String mediaId = message.optString("media_id", "");
         String mediaType = message.optString("media_type", "");

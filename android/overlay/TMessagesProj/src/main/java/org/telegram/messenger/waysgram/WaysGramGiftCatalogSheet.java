@@ -211,7 +211,7 @@ public final class WaysGramGiftCatalogSheet extends BottomSheet {
                         String serial = gift.optString("serial_number", "");
                         int level = gift.optInt("upgrade_level", 0);
                         labels[i] = name + (level > 0 ? " · уровень " + level : "")
-                                + (gift.optBoolean("is_listed", false) ? " · выставлен" : "")
+                                + (gift.optInt("is_listed", gift.optBoolean("is_listed", false) ? 1 : 0) == 1 ? " · выставлен" : "")
                                 + (serial.isEmpty() ? "" : "\n" + serial);
                     }
                     loading.dismiss();
@@ -252,7 +252,7 @@ public final class WaysGramGiftCatalogSheet extends BottomSheet {
             return;
         }
         ArrayList<String> actions = new ArrayList<>();
-        boolean listed = gift.optBoolean("is_listed", false);
+        boolean listed = gift.optInt("is_listed", gift.optBoolean("is_listed", false) ? 1 : 0) == 1;
         actions.add(listed ? "Снять с продажи" : "Выставить на продажу");
         boolean canUpgrade = gift.optString("telegram_gift_id", "").length() > 0;
         if (canUpgrade) {

@@ -26,6 +26,22 @@ class AndroidDevBuildConfigurationTests(unittest.TestCase):
             encoding="utf-8",
         )
         (root / "TMessagesProj_App").mkdir()
+        telegram_config = {
+            "project_info": {
+                "project_number": "760348033672",
+                "project_id": "tmessages2",
+            },
+            "client": [{
+                "client_info": {
+                    "mobilesdk_app_id": "1:760348033672:android:telegram123456",
+                    "android_client_info": {"package_name": "org.telegram.messenger"},
+                },
+                "api_key": [{"current_key": "AIzaTelegramPublicClientKey"}],
+            }],
+        }
+        (root / "TMessagesProj_App/google-services.json").write_text(
+            json.dumps(telegram_config), encoding="utf-8"
+        )
         (root / "TMessagesProj_App/build.gradle").write_text(
             'android {\n'
             '    buildTypes {\n'
@@ -97,6 +113,24 @@ class AndroidDevBuildConfigurationTests(unittest.TestCase):
             self.assertIn('PROJECT_ID = "waysgram-59956"', generated)
             self.assertIn('SENDER_ID = "123456789012"', generated)
             self.assertIn('APP_ID = "1:123456789012:android:abcdef012345"', generated)
+
+            google_services = json.loads(
+                (root / "TMessagesProj_App/google-services.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(google_services["project_info"]["project_id"], "waysgram-59956")
+            self.assertEqual(
+                google_services["client"][0]["client_info"]["android_client_info"]["package_name"],
+                "org.waysgram.messenger",
+            )
+
+            telegram_generated = (
+                root / "TMessagesProj/src/main/java/org/telegram/messenger/waysgram/"
+                "TelegramFirebaseConfig.java"
+            ).read_text(encoding="utf-8")
+            self.assertIn('APP_NAME = "telegram-push"', telegram_generated)
+            self.assertIn('PROJECT_ID = "tmessages2"', telegram_generated)
+            self.assertIn('APP_ID = "1:760348033672:android:telegram123456"', telegram_generated)
+            self.assertIn("FirebaseApp.initializeApp(context, options, APP_NAME)", telegram_generated)
 
     def test_firebase_config_rejects_wrong_registered_android_package(self) -> None:
         firebase_config = {

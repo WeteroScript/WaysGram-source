@@ -206,13 +206,13 @@ def configure_debug_application_id_suffix(android_root: Path) -> None:
         raise FileNotFoundError(f"Android app Gradle file not found: {build_file}")
 
     content = build_file.read_text(encoding="utf-8")
-    beta_pattern = re.compile(r'^[ \\t]*applicationIdSuffix "\\.beta"$', re.MULTILINE)
-    empty_pattern = re.compile(r'^[ \\t]*applicationIdSuffix ""$', re.MULTILINE)
+    beta_pattern = re.compile(r'^([ \t]*)applicationIdSuffix "\.beta"$', re.MULTILINE)
+    empty_pattern = re.compile(r'^[ \t]*applicationIdSuffix ""$', re.MULTILINE)
     beta_matches = beta_pattern.findall(content)
     empty_matches = empty_pattern.findall(content)
 
     if len(beta_matches) == 1 and len(empty_matches) == 0:
-        content = beta_pattern.sub(r'\\1applicationIdSuffix ""', content, count=1)
+        content = beta_pattern.sub(r'\1applicationIdSuffix ""', content, count=1)
     elif len(beta_matches) == 0 and len(empty_matches) == 1:
         pass
     else:
@@ -221,6 +221,7 @@ def configure_debug_application_id_suffix(android_root: Path) -> None:
         )
 
     build_file.write_text(content, encoding="utf-8")
+
 
 def configure_android_root(android_root: Path) -> None:
     if not (android_root / "gradlew").is_file():

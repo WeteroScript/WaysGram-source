@@ -240,6 +240,21 @@ class SourcePreservationTests(unittest.TestCase):
         )
         self.assertEqual(PATCHER.patch_push_service_source(patched), patched)
 
+    def test_telegram_token_provider_uses_its_named_firebase_app(self) -> None:
+        original = (
+            "FirebaseApp.initializeApp(ApplicationLoader.applicationContext);\\n"
+            "FirebaseMessaging.getInstance().getToken()"
+        )
+        patched = PATCHER.patch_push_listener_controller_source(original)
+        self.assertIn(
+            "TelegramFirebaseConfig.getMessaging(ApplicationLoader.applicationContext)",
+            patched,
+        )
+        self.assertIn("FirebaseMessaging telegramMessaging =", patched)
+        self.assertIn("telegramMessaging.getToken()", patched)
+        self.assertNotIn("FirebaseMessaging.getInstance().getToken()", patched)
+        self.assertEqual(PATCHER.patch_push_listener_controller_source(patched), patched)
+
     def test_notification_permission_is_added_to_both_android_manifests(self) -> None:
         anchor = '    <uses-permission android:name="com.google.android.c2dm.permission.RECEIVE" />\n'
         with tempfile.TemporaryDirectory() as temporary:

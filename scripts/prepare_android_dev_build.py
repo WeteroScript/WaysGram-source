@@ -345,10 +345,9 @@ def configure_android_root(android_root: Path) -> None:
     patch_string_resources(android_root)
 
     print(
-        "Configured WaysGram application label while retaining Telegram's existing "
-        "Firebase default app, API settings, permissions, and manifest declarations. "
-        "WaysGram secondary FCM: "
-        + ("configured." if firebase_configured else "not configured in this source-only run.")
+        "Configured WaysGram as the default Firebase app and preserved Telegram FCM "
+        "in a named Firebase app; Telegram API settings, permissions, and manifests remain intact. "
+        + ("WaysGram Firebase configured." if firebase_configured else "Firebase secrets were not supplied.")
     )
 
 

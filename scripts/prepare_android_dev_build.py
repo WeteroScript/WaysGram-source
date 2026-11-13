@@ -199,6 +199,98 @@ def configured_android_package() -> str:
     return WAYSGRAM_FIREBASE_PACKAGE_NAME
 
 
+
+def configure_debug_application_id_suffix(android_root: Path) -> None:
+    """Use the registered WaysGram package for AfatDebug, without Telegram's .beta suffix."""
+    build_file = android_root / "TMessagesProj_App/build.gradle"
+    if not build_file.is_file():
+        raise FileNotFoundError(f"Android app Gradle file not found: {build_file}")
+
+    content = build_file.read_text(encoding="utf-8")
+    beta_pattern = re.compile(r'^([ \\t]*)applicationIdSuffix "\\.beta"    if not (android_root / "gradlew").is_file():
+        raise FileNotFoundError(f"Android Gradle wrapper not found in {android_root}")
+
+    gradle_properties = android_root / "gradle.properties"
+    content = gradle_properties.read_text(encoding="utf-8")
+    content = replace_one(
+        r"^APP_PACKAGE=.*$",
+        f"APP_PACKAGE={configured_android_package()}",
+        content,
+        "Android application ID",
+    )
+    gradle_properties.write_text(content, encoding="utf-8")
+    configure_debug_application_id_suffix(android_root)
+    configure_default_api_base_url(android_root)
+    firebase_configured = configure_waysgram_firebase(android_root)
+    patch_string_resources(android_root)
+
+    print(
+        "Configured WaysGram application label while retaining Telegram's existing "
+        "Firebase default app, API settings, permissions, and manifest declarations. "
+        "WaysGram secondary FCM: "
+        + ("configured." if firebase_configured else "not configured in this source-only run.")
+    )
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--android-root", required=True, type=Path)
+    args = parser.parse_args()
+    configure_android_root(args.android_root)
+
+
+if __name__ == "__main__":
+    main()
+, re.MULTILINE)
+    empty_pattern = re.compile(r'^[ \\t]*applicationIdSuffix ""    if not (android_root / "gradlew").is_file():
+        raise FileNotFoundError(f"Android Gradle wrapper not found in {android_root}")
+
+    gradle_properties = android_root / "gradle.properties"
+    content = gradle_properties.read_text(encoding="utf-8")
+    content = replace_one(
+        r"^APP_PACKAGE=.*$",
+        f"APP_PACKAGE={configured_android_package()}",
+        content,
+        "Android application ID",
+    )
+    gradle_properties.write_text(content, encoding="utf-8")
+    configure_default_api_base_url(android_root)
+    firebase_configured = configure_waysgram_firebase(android_root)
+    patch_string_resources(android_root)
+
+    print(
+        "Configured WaysGram application label while retaining Telegram's existing "
+        "Firebase default app, API settings, permissions, and manifest declarations. "
+        "WaysGram secondary FCM: "
+        + ("configured." if firebase_configured else "not configured in this source-only run.")
+    )
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--android-root", required=True, type=Path)
+    args = parser.parse_args()
+    configure_android_root(args.android_root)
+
+
+if __name__ == "__main__":
+    main()
+, re.MULTILINE)
+    beta_matches = beta_pattern.findall(content)
+    empty_matches = empty_pattern.findall(content)
+
+    if len(beta_matches) == 1 and len(empty_matches) == 0:
+        content = beta_pattern.sub(r'\\1applicationIdSuffix ""', content, count=1)
+    elif len(beta_matches) == 0 and len(empty_matches) == 1:
+        pass
+    else:
+        raise ValueError(
+            "Expected exactly one AfatDebug .beta suffix or its already-configured empty value"
+        )
+
+    build_file.write_text(content, encoding="utf-8")
+
+
 def configure_android_root(android_root: Path) -> None:
     if not (android_root / "gradlew").is_file():
         raise FileNotFoundError(f"Android Gradle wrapper not found in {android_root}")

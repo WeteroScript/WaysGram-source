@@ -41,7 +41,7 @@ https://bot-1793554244-6434-weterochina.bothost.tech
 ## Сборка и проверки
 
 - `scripts/apply-android-patches.py` проверяет, что оригинальные точки входа и экран подарков не были изменены.
-- `scripts/prepare_android_dev_build.py` задаёт имя WaysGram и сохраняет зарегистрированный Firebase-совместимый package `org.telegram.messenger` (для debug-варианта итоговый package — `org.telegram.messenger.beta`), не меняя исходные Telegram API-настройки, сервисы, manifest или launcher icon.
+- `scripts/prepare_android_dev_build.py` задаёт package `org.waysgram.messenger` и имя WaysGram, формирует Google Services-конфигурацию из `FIREBASE_CONFIG` проекта `waysgram-59956`, а исходные Telegram FCM-реквизиты переносит в отдельный именованный FirebaseApp. Telegram API-настройки, манифест и launcher icon не подменяются.
 - `.github/workflows/source-check.yml` проверяет скрипты и контракт исходников.
 - `.github/workflows/android-apk.yml` содержит отдельный workflow сборки debug APK. Сам факт наличия workflow не является подтверждением успешной сборки; ориентироваться нужно на результат конкретного запуска.
 

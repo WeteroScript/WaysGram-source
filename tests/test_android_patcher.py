@@ -242,8 +242,8 @@ class SourcePreservationTests(unittest.TestCase):
 
     def test_telegram_token_provider_uses_its_named_firebase_app(self) -> None:
         original = (
-            "FirebaseApp.initializeApp(ApplicationLoader.applicationContext);\n"
-            "FirebaseMessaging.getInstance().getToken()"
+            "                    FirebaseApp.initializeApp(ApplicationLoader.applicationContext);\n"
+            "                    FirebaseMessaging.getInstance().getToken()"
         )
         patched = PATCHER.patch_push_listener_controller_source(original)
         self.assertIn(

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Configure the WaysGram Android build without replacing Telegram's Firebase project.
+"""Configure Firebase for WaysGram as the default app and retain Telegram FCM separately.
 
-Telegram remains the default Firebase app so its existing FCM token and delivery
-continue to work. WaysGram is initialized as a secondary FirebaseApp at runtime.
+The build uses the registered WaysGram google-services.json. Telegram's original
+FCM client is emitted as a named FirebaseApp and used by the Telegram token provider.
+WaysGram also keeps its dedicated named FirebaseApp for its own notification token.
 """
 from __future__ import annotations
 
@@ -91,16 +92,17 @@ def configure_default_api_base_url(android_root: Path) -> None:
 
 
 def configure_waysgram_firebase(android_root: Path) -> bool:
-    """Generate secondary FirebaseOptions from the registered WaysGram Android app JSON."""
-    raw_config = (os.getenv("FIREBASE_CONFIG", "").strip() or os.getenv("WAYSGRAM_FIREBASE_CONFIG_JSON", "").strip())
+    """Generate WaysGram default Google Services config and separate Telegram FCM options."""
+    raw_config = (
+        os.getenv("FIREBASE_CONFIG", "").strip()
+        or os.getenv("WAYSGRAM_FIREBASE_CONFIG_JSON", "").strip()
+    )
     required = os.getenv("WAYSGRAM_REQUIRE_FIREBASE_CONFIG", "").strip().lower() in {
         "1", "true", "yes"
     }
     if not raw_config:
         if required:
-            raise ValueError(
-                "FIREBASE_CONFIG is required for an Android APK build"
-            )
+            raise ValueError("FIREBASE_CONFIG is required for an Android APK build")
         return False
 
     try:
@@ -138,14 +140,107 @@ def configure_waysgram_firebase(android_root: Path) -> bool:
     if not app_id.startswith(f"1:{sender_id}:android:") or not api_key:
         raise ValueError("Firebase Android client is missing mobilesdk_app_id or current_key")
 
+    telegram_json = android_root / "TMessagesProj_App/google-services.json"
+    if not telegram_json.is_file():
+        raise FileNotFoundError(f"Pinned Telegram Firebase config not found: {telegram_json}")
+    try:
+        telegram_config = json.loads(telegram_json.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError("Pinned Telegram google-services.json is invalid") from exc
+
+    telegram_project = telegram_config.get("project_info", {})
+    telegram_clients = telegram_config.get("client", [])
+    if not isinstance(telegram_project, dict) or not isinstance(telegram_clients, list):
+        raise ValueError("Pinned Telegram Firebase config is missing project_info or client")
+    telegram_sender_id = str(telegram_project.get("project_number") or "").strip()
+    telegram_project_id = str(telegram_project.get("project_id") or "").strip()
+    telegram_matches = []
+    for client in telegram_clients:
+        client_info = client.get("client_info", {}) if isinstance(client, dict) else {}
+        android_info = client_info.get("android_client_info", {}) if isinstance(client_info, dict) else {}
+        if android_info.get("package_name") == "org.telegram.messenger":
+            telegram_matches.append(client)
+    if len(telegram_matches) != 1 or not telegram_sender_id.isdigit() or not telegram_project_id:
+        raise ValueError("Pinned Telegram Firebase config has no unique org.telegram.messenger client")
+
+    telegram_client = telegram_matches[0]
+    telegram_app_id = str(telegram_client.get("client_info", {}).get("mobilesdk_app_id") or "").strip()
+    telegram_api_keys = telegram_client.get("api_key", [])
+    telegram_api_key = (
+        str(telegram_api_keys[0].get("current_key") or "").strip()
+        if telegram_api_keys else ""
+    )
+    if (
+        not telegram_app_id.startswith(f"1:{telegram_sender_id}:android:")
+        or not telegram_api_key
+    ):
+        raise ValueError("Pinned Telegram Firebase client is missing app ID or API key")
+
     def java_string(value: str) -> str:
         return json.dumps(value, ensure_ascii=True)
 
-    java_source = f'''package org.telegram.messenger.waysgram;
+    telegram_java = f'''package org.telegram.messenger.waysgram;
+
+import android.content.Context;
+
+import com.google.firebase.FirebaseApp;
+import com.google.firebase.FirebaseOptions;
+import com.google.firebase.messaging.FirebaseMessaging;
+
+import java.util.List;
+
+/** Build-generated Telegram FCM credentials, isolated from WaysGram's default Firebase app. */
+public final class TelegramFirebaseConfig {{
+    private static final String APP_NAME = "telegram-push";
+    private static final Object LOCK = new Object();
+    private static final String APP_ID = {java_string(telegram_app_id)};
+    private static final String API_KEY = {java_string(telegram_api_key)};
+    private static final String PROJECT_ID = {java_string(telegram_project_id)};
+    private static final String SENDER_ID = {java_string(telegram_sender_id)};
+
+    private TelegramFirebaseConfig() {{
+    }}
+
+    public static FirebaseMessaging getMessaging(Context context) {{
+        if (context == null) {{
+            return null;
+        }}
+        synchronized (LOCK) {{
+            FirebaseApp app = null;
+            List<FirebaseApp> apps = FirebaseApp.getApps(context);
+            for (FirebaseApp candidate : apps) {{
+                if (APP_NAME.equals(candidate.getName())) {{
+                    app = candidate;
+                    break;
+                }}
+            }}
+            if (app == null) {{
+                FirebaseOptions options = new FirebaseOptions.Builder()
+                        .setApplicationId(APP_ID)
+                        .setApiKey(API_KEY)
+                        .setProjectId(PROJECT_ID)
+                        .setGcmSenderId(SENDER_ID)
+                        .build();
+                app = FirebaseApp.initializeApp(context, options, APP_NAME);
+            }}
+            return app == null ? null : app.get(FirebaseMessaging.class);
+        }}
+    }}
+}}
+'''
+
+    telegram_output = (
+        android_root
+        / "TMessagesProj/src/main/java/org/telegram/messenger/waysgram/TelegramFirebaseConfig.java"
+    )
+    telegram_output.parent.mkdir(parents=True, exist_ok=True)
+    telegram_output.write_text(telegram_java, encoding="utf-8")
+
+    waysgram_java = f'''package org.telegram.messenger.waysgram;
 
 /**
- * Build-generated public Firebase client options for WaysGram.
- * The Telegram default Firebase configuration remains untouched.
+ * Build-generated public Firebase client options for the WaysGram secondary app.
+ * The default Google Services app is also configured for WaysGram.
  */
 public final class WaysGramFirebaseConfig {{
     public static final String APP_ID = {java_string(app_id)};
@@ -162,12 +257,20 @@ public final class WaysGramFirebaseConfig {{
     }}
 }}
 '''
-    output = (
+    waysgram_output = (
         android_root
         / "TMessagesProj/src/main/java/org/telegram/messenger/waysgram/WaysGramFirebaseConfig.java"
     )
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(java_source, encoding="utf-8")
+    waysgram_output.parent.mkdir(parents=True, exist_ok=True)
+    waysgram_output.write_text(waysgram_java, encoding="utf-8")
+
+    # Google Services requires a client matching the resolved Android application ID.
+    # Telegram's original FCM app has already been preserved above as a named FirebaseApp.
+    google_services_output = android_root / "TMessagesProj_App/google-services.json"
+    google_services_output.write_text(
+        json.dumps(config, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
     return True
 
 

@@ -156,6 +156,35 @@ def patch_push_service_source(original: str) -> str:
     return updated
 
 
+def patch_push_listener_controller_source(original: str) -> str:
+    """Keep Telegram's push token registered with its original named Firebase app."""
+    before = (
+        "                    FirebaseApp.initializeApp(ApplicationLoader.applicationContext);\n"
+        "                    FirebaseMessaging.getInstance().getToken()"
+    )
+    marker = "TelegramFirebaseConfig.getMessaging(ApplicationLoader.applicationContext)"
+    if marker in original:
+        if "telegramMessaging.getToken()" not in original:
+            raise ValueError("PushListenerController contains a partial Telegram Firebase isolation patch")
+        return original
+
+    after = (
+        "                    FirebaseMessaging telegramMessaging = "
+        "org.telegram.messenger.waysgram.TelegramFirebaseConfig.getMessaging("
+        "ApplicationLoader.applicationContext);\n"
+        "                    if (telegramMessaging == null) {\n"
+        "                        throw new IllegalStateException(\"Telegram Firebase messaging is not configured\");\n"
+        "                    }\n"
+        "                    telegramMessaging.getToken()"
+    )
+    return replace_exactly_once(
+        original,
+        before,
+        after,
+        "Telegram Firebase named-app token provider",
+    )
+
+
 def patch_notification_permissions(android_root: Path) -> None:
     """Declare Android 13+ notification permission in both app manifests."""
     anchor = '    <uses-permission android:name="com.google.android.c2dm.permission.RECEIVE" />\n'
@@ -212,6 +241,13 @@ def verify_source(android_root: Path) -> None:
     patched_push_source = patch_push_service_source(push_source)
     if patched_push_source != push_source:
         push_service.write_text(patched_push_source, encoding="utf-8")
+    push_listener = android_root / "TMessagesProj/src/main/java/org/telegram/messenger/PushListenerController.java"
+    if not push_listener.is_file():
+        raise FileNotFoundError(f"Required Telegram push token provider not found: {push_listener}")
+    push_listener_source = push_listener.read_text(encoding="utf-8")
+    patched_push_listener = patch_push_listener_controller_source(push_listener_source)
+    if patched_push_listener != push_listener_source:
+        push_listener.write_text(patched_push_listener, encoding="utf-8")
     patch_notification_permissions(android_root)
 
     final_settings = settings_activity.read_text(encoding="utf-8")
@@ -223,6 +259,13 @@ def verify_source(android_root: Path) -> None:
         or "WaysGramPushManager.sync(this);" not in final_push_source
     ):
         raise ValueError("WaysGram FCM routing is missing after patching")
+
+    final_push_listener = push_listener.read_text(encoding="utf-8")
+    if (
+        "TelegramFirebaseConfig.getMessaging(ApplicationLoader.applicationContext)" not in final_push_listener
+        or "telegramMessaging.getToken()" not in final_push_listener
+    ):
+        raise ValueError("Telegram FCM token provider is not isolated on its original Firebase app")
 
 
 def main() -> None:

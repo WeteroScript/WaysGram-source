@@ -26,7 +26,19 @@ class AndroidDevBuildConfigurationTests(unittest.TestCase):
             encoding="utf-8",
         )
         (root / "TMessagesProj_App").mkdir()
-        (root / "TMessagesProj_App/build.gradle").write_text("unchanged build file\n", encoding="utf-8")
+        (root / "TMessagesProj_App/build.gradle").write_text(
+            'android {\n'
+            '    buildTypes {\n'
+            '        debug {\n'
+            '            applicationIdSuffix ".beta"\n'
+            '        }\n'
+            '        standalone {\n'
+            '            applicationIdSuffix ".web"\n'
+            '        }\n'
+            '    }\n'
+            '}\n',
+            encoding="utf-8",
+        )
         (root / "TMessagesProj/src/main/java/org/telegram/messenger/BuildVars.java").write_text(
             "unchanged runtime settings\n", encoding="utf-8"
         )
@@ -41,11 +53,15 @@ class AndroidDevBuildConfigurationTests(unittest.TestCase):
             runtime = root / "TMessagesProj/src/main/java/org/telegram/messenger/BuildVars.java"
             build_file = root / "TMessagesProj_App/build.gradle"
             manifest = root / "TMessagesProj/config/debug/AndroidManifest.xml"
-            before = [path.read_text(encoding="utf-8") for path in (runtime, build_file, manifest)]
+            before = [path.read_text(encoding="utf-8") for path in (runtime, manifest)]
 
             configure_android_root(root)
 
-            self.assertEqual([path.read_text(encoding="utf-8") for path in (runtime, build_file, manifest)], before)
+            self.assertEqual([path.read_text(encoding="utf-8") for path in (runtime, manifest)], before)
+            gradle_build = build_file.read_text(encoding="utf-8")
+            self.assertIn('applicationIdSuffix ""', gradle_build)
+            self.assertNotIn('applicationIdSuffix ".beta"', gradle_build)
+            self.assertIn('applicationIdSuffix ".web"', gradle_build)
             self.assertFalse((root / "TMessagesProj/src/main/res/drawable/waysgram_launcher.xml").exists())
             props = (root / "gradle.properties").read_text(encoding="utf-8")
             self.assertIn("APP_PACKAGE=org.waysgram.messenger", props)
